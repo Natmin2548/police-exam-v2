@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Sparkles, ArrowRight, Shield, Award, Users, BookOpen } from "lucide-react";
+import { Sparkles, ArrowRight, Shield } from "lucide-react";
 
 interface HeroSectionProps {
   onOpenLogin: () => void;
@@ -94,9 +94,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <span className="text-2xl sm:text-4xl font-black text-[#BD1B0B] leading-tight tracking-tight">
                 {stats.users}
               </span>
-              <span className="text-[11px] sm:text-sm text-slate-600 font-bold mt-1 flex items-center gap-1">
-                <Users className="w-3 h-3 text-[#BD1B0B] hidden sm:inline" />
-                <span>ผู้ใช้งาน</span>
+              <span className="text-[11px] sm:text-sm text-slate-600 font-bold mt-1">
+                ผู้ใช้งาน
               </span>
             </div>
 
@@ -105,9 +104,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <span className="text-2xl sm:text-4xl font-black text-slate-900 leading-tight tracking-tight">
                 {stats.exams}
               </span>
-              <span className="text-[11px] sm:text-sm text-slate-600 font-bold mt-1 flex items-center gap-1">
-                <BookOpen className="w-3 h-3 text-slate-700 hidden sm:inline" />
-                <span>ข้อสอบจริง</span>
+              <span className="text-[11px] sm:text-sm text-slate-600 font-bold mt-1">
+                ข้อสอบจริง
               </span>
             </div>
 
@@ -116,9 +114,8 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <span className="text-2xl sm:text-4xl font-black text-emerald-600 leading-tight tracking-tight">
                 {stats.passRate}
               </span>
-              <span className="text-[11px] sm:text-sm text-slate-600 font-bold mt-1 flex items-center gap-1">
-                <Award className="w-3 h-3 text-emerald-600 hidden sm:inline" />
-                <span>สอบผ่าน</span>
+              <span className="text-[11px] sm:text-sm text-slate-600 font-bold mt-1">
+                สอบผ่าน
               </span>
             </div>
           </div>
