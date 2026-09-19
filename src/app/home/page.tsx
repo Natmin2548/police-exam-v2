@@ -1,10 +1,35 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Shield, BookOpen, User, LogOut, ArrowRight, CheckCircle2, Trophy, Clock } from "lucide-react";
+import { Shield, BookOpen, User as UserIcon, LogOut, ArrowRight, CheckCircle2, Trophy, Clock } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import type { User } from "@supabase/supabase-js";
 
 export default function HomePage() {
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    fetchUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  };
+
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
       {/* Top Navbar for Home */}
@@ -26,16 +51,27 @@ export default function HomePage() {
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs sm:text-sm font-medium">
-              <User className="w-4 h-4 text-[#BD1B0B]" />
-              <span className="font-semibold">ผู้ใช้งาน</span>
+              {user?.user_metadata?.avatar_url ? (
+                <img
+                  src={user.user_metadata.avatar_url}
+                  alt="avatar"
+                  className="w-5 h-5 rounded-full object-cover"
+                />
+              ) : (
+                <UserIcon className="w-4 h-4 text-[#BD1B0B]" />
+              )}
+              <span className="font-semibold truncate max-w-[140px] sm:max-w-[200px]">
+                {user?.user_metadata?.full_name || user?.email || "ผู้ใช้งาน"}
+              </span>
             </div>
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-600 hover:text-red-600 px-3 py-1.5 rounded-xl hover:bg-red-50 transition-colors"
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-600 hover:text-red-600 px-3 py-1.5 rounded-xl hover:bg-red-50 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
               <span>ออกจากระบบ</span>
-            </Link>
+            </button>
           </div>
         </div>
       </header>

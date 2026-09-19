@@ -6,14 +6,35 @@ import { HeroSection } from "./HeroSection";
 import { Footer } from "./Footer";
 import { LoginModal } from "./LoginModal";
 
+import { supabase } from "@/lib/supabaseClient";
+
 export const LandingPage: React.FC = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleOpenLogin = () => setIsLoginModalOpen(true);
   const handleCloseLogin = () => setIsLoginModalOpen(false);
 
-  const handleGoogleLogin = () => {
-    alert("ระบบเข้าสู่ระบบด้วย Google");
+  const handleGoogleLogin = async () => {
+    try {
+      setIsLoading(true);
+      const origin = typeof window !== "undefined" ? window.location.origin : "https://police-exam-th.vercel.app";
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        console.error("Google sign-in error:", error.message);
+        alert("เกิดข้อผิดพลาดในการเข้าสู่ระบบ: " + error.message);
+        setIsLoading(false);
+      }
+    } catch (err) {
+      console.error("Sign-in unexpected error:", err);
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -23,7 +44,7 @@ export const LandingPage: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-1">
-        <HeroSection onOpenLogin={handleOpenLogin} />
+        <HeroSection onOpenLogin={handleGoogleLogin} />
       </main>
 
       {/* Footer */}
