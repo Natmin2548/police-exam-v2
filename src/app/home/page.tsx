@@ -150,16 +150,17 @@ export default function HomePage() {
     window.location.href = "/";
   };
 
-  // Google User Data
+  // Google User Data (Direct Email as Name)
   const avatarUrl =
     user?.user_metadata?.avatar_url ||
     user?.user_metadata?.picture ||
     "";
 
   const displayName =
+    user?.email ||
+    user?.user_metadata?.email ||
     user?.user_metadata?.full_name ||
-    user?.user_metadata?.name ||
-    (user?.email ? user.email.split("@")[0] : "ผู้ใช้งาน");
+    "ผู้ใช้งาน";
 
   return (
     <div className="min-h-screen bg-[#FBFBFB] text-slate-900 pb-28 font-sans selection:bg-red-100 selection:text-red-900">
@@ -192,7 +193,7 @@ export default function HomePage() {
               <span className="text-[11px] text-slate-500 font-medium leading-none">
                 {greeting}
               </span>
-              <span className="text-sm font-black text-slate-900 leading-tight truncate max-w-[140px] sm:max-w-[180px]">
+              <span className="text-sm font-black text-slate-900 leading-tight truncate max-w-[180px] sm:max-w-[280px]">
                 {displayName}
               </span>
             </div>
@@ -279,7 +280,7 @@ export default function HomePage() {
 
         {/* Section: สถิติ */}
         <div>
-          <h2 className="text-base font-black text-slate-900 mb-3">สถิติ</h2>
+          <h2 className="text-base font-black text-slate-900 mb-3 px-5 sm:px-6">สถิติ</h2>
           <div className="grid grid-cols-3 gap-3">
             {/* Stat 1: ทำแล้ว */}
             <div className="bg-white border border-slate-200/80 rounded-2xl h-24 px-2 text-center shadow-xs flex flex-col items-center justify-center">
