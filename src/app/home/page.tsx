@@ -118,10 +118,19 @@ export default function HomePage() {
     else setGreeting("สวัสดีตอนค่ำ");
 
     const fetchUser = async () => {
+      // Check session first for fast load
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        setUser(session.user);
+      } else {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        setUser(user);
+      }
     };
     fetchUser();
 
@@ -141,11 +150,16 @@ export default function HomePage() {
     window.location.href = "/";
   };
 
-  // Get display name (e.g. first word of full name, or email prefix)
+  // Google User Data
+  const avatarUrl =
+    user?.user_metadata?.avatar_url ||
+    user?.user_metadata?.picture ||
+    "";
+
   const displayName =
-    user?.user_metadata?.full_name?.split(" ")[0] ||
-    user?.email?.split("@")[0] ||
-    "มีน";
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    (user?.email ? user.email.split("@")[0] : "ผู้ใช้งาน");
 
   return (
     <div className="min-h-screen bg-[#FBFBFB] text-slate-900 pb-28 font-sans selection:bg-red-100 selection:text-red-900">
@@ -178,7 +192,7 @@ export default function HomePage() {
               <span className="text-[11px] text-slate-500 font-medium leading-none">
                 {greeting}
               </span>
-              <span className="text-sm font-black text-slate-900 leading-tight">
+              <span className="text-sm font-black text-slate-900 leading-tight truncate max-w-[140px] sm:max-w-[180px]">
                 {displayName}
               </span>
             </div>
@@ -189,12 +203,14 @@ export default function HomePage() {
                 type="button"
                 onClick={handleLogout}
                 title="คลิกเพื่อออกจากระบบ"
-                className="w-10 h-10 rounded-full ring-2 ring-slate-100 overflow-hidden bg-slate-200 flex items-center justify-center hover:opacity-85 transition-opacity cursor-pointer"
+                className="w-10 h-10 rounded-full ring-2 ring-slate-100 overflow-hidden bg-slate-200 flex items-center justify-center hover:opacity-85 transition-opacity cursor-pointer shrink-0"
               >
-                {user?.user_metadata?.avatar_url ? (
+                {avatarUrl ? (
                   <img
-                    src={user.user_metadata.avatar_url}
+                    src={avatarUrl}
                     alt={displayName}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -266,27 +282,42 @@ export default function HomePage() {
           <h2 className="text-base font-black text-slate-900 mb-3">สถิติ</h2>
           <div className="grid grid-cols-3 gap-3">
             {/* Stat 1: ทำแล้ว */}
-            <div className="bg-white border border-slate-100 rounded-2xl py-4 sm:py-5 px-3 text-center shadow-xs flex flex-col items-center justify-center">
-              <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">
-                {stats.completedSets} <span className="text-sm font-bold">ชุด</span>
+            <div className="bg-white border border-slate-200/80 rounded-2xl h-24 px-2 text-center shadow-xs flex flex-col items-center justify-center">
+              <div className="flex items-baseline justify-center gap-1 leading-none mb-1.5">
+                <span className="text-2xl sm:text-3xl font-black text-slate-900">
+                  {stats.completedSets}
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-slate-600">
+                  ชุด
+                </span>
               </div>
-              <span className="text-xs text-slate-400 font-semibold">ทำแล้ว</span>
+              <span className="text-xs text-slate-400 font-medium">ทำแล้ว</span>
             </div>
 
             {/* Stat 2: เฉลี่ย (Highlighted Rose/Pink) */}
-            <div className="bg-[#FFF5F5] border border-red-100 rounded-2xl py-4 sm:py-5 px-3 text-center shadow-xs flex flex-col items-center justify-center">
-              <div className="text-2xl sm:text-3xl font-black text-[#BD1B0B] tracking-tight leading-none mb-1">
-                {stats.averageScore}<span className="text-sm font-bold">%</span>
+            <div className="bg-[#FFF5F5] border border-red-200/70 rounded-2xl h-24 px-2 text-center shadow-xs flex flex-col items-center justify-center">
+              <div className="flex items-baseline justify-center gap-0.5 leading-none mb-1.5">
+                <span className="text-2xl sm:text-3xl font-black text-[#BD1B0B]">
+                  {stats.averageScore}
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-[#BD1B0B]">
+                  %
+                </span>
               </div>
-              <span className="text-xs text-slate-500 font-semibold">เฉลี่ย</span>
+              <span className="text-xs text-slate-500 font-medium">เฉลี่ย</span>
             </div>
 
             {/* Stat 3: สูงสุด */}
-            <div className="bg-white border border-slate-100 rounded-2xl py-4 sm:py-5 px-3 text-center shadow-xs flex flex-col items-center justify-center">
-              <div className="text-2xl sm:text-3xl font-black text-[#BD1B0B] tracking-tight leading-none mb-1">
-                {stats.maxScore}<span className="text-sm font-bold">%</span>
+            <div className="bg-white border border-slate-200/80 rounded-2xl h-24 px-2 text-center shadow-xs flex flex-col items-center justify-center">
+              <div className="flex items-baseline justify-center gap-0.5 leading-none mb-1.5">
+                <span className="text-2xl sm:text-3xl font-black text-[#BD1B0B]">
+                  {stats.maxScore}
+                </span>
+                <span className="text-xs sm:text-sm font-bold text-[#BD1B0B]">
+                  %
+                </span>
               </div>
-              <span className="text-xs text-slate-400 font-semibold">สูงสุด</span>
+              <span className="text-xs text-slate-400 font-medium">สูงสุด</span>
             </div>
           </div>
         </div>

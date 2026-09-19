@@ -9,21 +9,37 @@ export default function AuthCallbackPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
+    const handleAuth = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error("Auth callback error:", error.message);
+        // Handle PKCE code in query parameters
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          const code = params.get("code");
+          if (code) {
+            await supabase.auth.exchangeCodeForSession(code);
+          } else {
+            await supabase.auth.getSession();
+          }
         }
-        // Redirect to /home after session initialized
         router.replace("/home");
       } catch (err) {
-        console.error("Unexpected error:", err);
+        console.error("Auth callback error:", err);
         router.replace("/home");
       }
     };
 
-    handleAuthCallback();
+    handleAuth();
+
+    // Listen for auth state change
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        router.replace("/home");
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, [router]);
 
   return (
