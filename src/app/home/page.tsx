@@ -95,6 +95,7 @@ const subjectsMetadata = [
 
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [greeting, setGreeting] = useState("สวัสดีตอนบ่าย");
   const [activeTab, setActiveTab] = useState<"home" | "archive" | "rank">("home");
   const [stats, setStats] = useState<UserStats>(defaultStats);
@@ -117,27 +118,46 @@ export default function HomePage() {
     else if (hour >= 17 && hour < 21) setGreeting("สวัสดีตอนเย็น");
     else setGreeting("สวัสดีตอนค่ำ");
 
-    const fetchUser = async () => {
-      // Check session first for fast load
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (session?.user) {
-        setUser(session.user);
-      } else {
+    const checkAuth = async () => {
+      try {
         const {
-          data: { user },
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (session?.user) {
+          setUser(session.user);
+          setIsAuthChecking(false);
+          return;
+        }
+
+        const {
+          data: { user: currentUser },
         } = await supabase.auth.getUser();
-        setUser(user);
+
+        if (currentUser) {
+          setUser(currentUser);
+          setIsAuthChecking(false);
+        } else {
+          // If not logged in, bounce to landing page immediately
+          window.location.replace("/");
+        }
+      } catch (err) {
+        console.error("Auth check failed:", err);
+        window.location.replace("/");
       }
     };
-    fetchUser();
+
+    checkAuth();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        setUser(session.user);
+        setIsAuthChecking(false);
+      } else {
+        window.location.replace("/");
+      }
     });
 
     return () => {
@@ -147,7 +167,7 @@ export default function HomePage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/";
+    window.location.replace("/");
   };
 
   // Google User Data (Direct Email as Name)
@@ -160,7 +180,17 @@ export default function HomePage() {
     user?.email ||
     user?.user_metadata?.email ||
     user?.user_metadata?.full_name ||
-    "ผู้ใช้งาน";
+    user?.user_metadata?.name ||
+    "";
+
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-[#FBFBFB] flex flex-col items-center justify-center gap-3">
+        <div className="w-9 h-9 rounded-full border-2 border-red-200 border-t-[#BD1B0B] animate-spin" />
+        <p className="text-xs text-slate-500 font-bold">กำลังตรวจสอบสิทธิ์...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FBFBFB] text-slate-900 pb-28 font-sans selection:bg-red-100 selection:text-red-900">
@@ -215,8 +245,8 @@ export default function HomePage() {
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-tr from-slate-700 to-slate-900 flex items-center justify-center text-white text-sm font-bold">
-                    {displayName.charAt(0).toUpperCase()}
+                  <div className="w-full h-full bg-[#0288D1] flex items-center justify-center text-white text-sm font-bold">
+                    {(displayName || "U").charAt(0).toUpperCase()}
                   </div>
                 )}
               </button>
