@@ -130,15 +130,14 @@ export default function HomePage() {
           return;
         }
 
-        const {
-          data: { user: currentUser },
-        } = await supabase.auth.getUser();
+        // Check if URL has active tokens or code being parsed
+        const hasTokens =
+          typeof window !== "undefined" &&
+          (window.location.hash.includes("access_token") ||
+            window.location.search.includes("code"));
 
-        if (currentUser) {
-          setUser(currentUser);
-          setIsAuthChecking(false);
-        } else {
-          // If not logged in, bounce to landing page immediately
+        if (!hasTokens) {
+          // If not logged in and no tokens, bounce to landing page
           window.location.replace("/");
         }
       } catch (err) {
@@ -156,7 +155,13 @@ export default function HomePage() {
         setUser(session.user);
         setIsAuthChecking(false);
       } else {
-        window.location.replace("/");
+        const hasTokens =
+          typeof window !== "undefined" &&
+          (window.location.hash.includes("access_token") ||
+            window.location.search.includes("code"));
+        if (!hasTokens) {
+          window.location.replace("/");
+        }
       }
     });
 
