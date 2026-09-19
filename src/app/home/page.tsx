@@ -20,24 +20,37 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
-interface SubjectProgress {
-  id: string;
-  name: string;
-  count: string;
-  score: number;
-  iconType: "text" | "brain" | "laptop" | "scale" | "globe";
-  iconText?: string;
-  iconColor?: string;
-  bgColor?: string;
+interface UserStats {
+  completedSets: number;
+  averageScore: number;
+  maxScore: number;
+  subjects: {
+    [key: string]: {
+      count: number;
+      score: number;
+    };
+  };
 }
 
-const subjectsData: SubjectProgress[] = [
+const defaultStats: UserStats = {
+  completedSets: 0,
+  averageScore: 0,
+  maxScore: 0,
+  subjects: {
+    thai: { count: 0, score: 0 },
+    math: { count: 0, score: 0 },
+    com: { count: 0, score: 0 },
+    law: { count: 0, score: 0 },
+    social: { count: 0, score: 0 },
+    eng: { count: 0, score: 0 },
+  },
+};
+
+const subjectsMetadata = [
   {
     id: "thai",
     name: "ภาษาไทย",
-    count: "3 ครั้ง",
-    score: 14,
-    iconType: "text",
+    iconType: "text" as const,
     iconText: "TH",
     iconColor: "text-red-600",
     bgColor: "bg-red-50",
@@ -45,45 +58,35 @@ const subjectsData: SubjectProgress[] = [
   {
     id: "math",
     name: "ความสามารถทั่วไป",
-    count: "3 ครั้ง",
-    score: 20,
-    iconType: "brain",
+    iconType: "brain" as const,
     iconColor: "text-pink-500",
     bgColor: "bg-pink-50",
   },
   {
     id: "com",
     name: "คอมพิวเตอร์",
-    count: "3 ครั้ง",
-    score: 44,
-    iconType: "laptop",
+    iconType: "laptop" as const,
     iconColor: "text-blue-500",
     bgColor: "bg-blue-50",
   },
   {
     id: "law",
     name: "กฎหมาย",
-    count: "3 ครั้ง",
-    score: 23,
-    iconType: "scale",
+    iconType: "scale" as const,
     iconColor: "text-amber-600",
     bgColor: "bg-amber-50",
   },
   {
     id: "social",
     name: "สังคม",
-    count: "2 ครั้ง",
-    score: 10,
-    iconType: "globe",
+    iconType: "globe" as const,
     iconColor: "text-emerald-500",
     bgColor: "bg-emerald-50",
   },
   {
     id: "eng",
     name: "ภาษาอังกฤษ",
-    count: "2 ครั้ง",
-    score: 14,
-    iconType: "text",
+    iconType: "text" as const,
     iconText: "EN",
     iconColor: "text-rose-600",
     bgColor: "bg-rose-50",
@@ -94,8 +97,19 @@ export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
   const [greeting, setGreeting] = useState("สวัสดีตอนบ่าย");
   const [activeTab, setActiveTab] = useState<"home" | "archive" | "rank">("home");
+  const [stats, setStats] = useState<UserStats>(defaultStats);
 
   useEffect(() => {
+    // Load real saved stats if available
+    try {
+      const saved = localStorage.getItem("police_exam_user_stats");
+      if (saved) {
+        setStats(JSON.parse(saved));
+      }
+    } catch {
+      // default clean stats
+    }
+
     // Determine dynamic Thai greeting based on current local hour
     const hour = new Date().getHours();
     if (hour >= 5 && hour < 12) setGreeting("สวัสดีตอนเช้า");
@@ -251,26 +265,26 @@ export default function HomePage() {
         <div>
           <h2 className="text-base font-black text-slate-900 mb-3">สถิติ</h2>
           <div className="grid grid-cols-3 gap-3">
-            {/* Stat 1: 20 ชุด */}
+            {/* Stat 1: ทำแล้ว */}
             <div className="bg-white border border-slate-100 rounded-2xl py-4 sm:py-5 px-3 text-center shadow-xs flex flex-col items-center justify-center">
               <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">
-                20 <span className="text-sm font-bold">ชุด</span>
+                {stats.completedSets} <span className="text-sm font-bold">ชุด</span>
               </div>
               <span className="text-xs text-slate-400 font-semibold">ทำแล้ว</span>
             </div>
 
-            {/* Stat 2: 21% (Highlighted Rose/Pink) */}
+            {/* Stat 2: เฉลี่ย (Highlighted Rose/Pink) */}
             <div className="bg-[#FFF5F5] border border-red-100 rounded-2xl py-4 sm:py-5 px-3 text-center shadow-xs flex flex-col items-center justify-center">
               <div className="text-2xl sm:text-3xl font-black text-[#BD1B0B] tracking-tight leading-none mb-1">
-                21<span className="text-sm font-bold">%</span>
+                {stats.averageScore}<span className="text-sm font-bold">%</span>
               </div>
               <span className="text-xs text-slate-500 font-semibold">เฉลี่ย</span>
             </div>
 
-            {/* Stat 3: 93% */}
+            {/* Stat 3: สูงสุด */}
             <div className="bg-white border border-slate-100 rounded-2xl py-4 sm:py-5 px-3 text-center shadow-xs flex flex-col items-center justify-center">
               <div className="text-2xl sm:text-3xl font-black text-[#BD1B0B] tracking-tight leading-none mb-1">
-                93<span className="text-sm font-bold">%</span>
+                {stats.maxScore}<span className="text-sm font-bold">%</span>
               </div>
               <span className="text-xs text-slate-400 font-semibold">สูงสุด</span>
             </div>
@@ -282,64 +296,69 @@ export default function HomePage() {
           <h2 className="text-base font-black text-slate-900 mb-4">รายวิชา</h2>
 
           <div className="space-y-4">
-            {subjectsData.map((subj) => (
-              <div
-                key={subj.id}
-                className="flex items-center gap-3 sm:gap-4 py-1.5 hover:bg-slate-50/80 -mx-2 px-2 rounded-2xl transition-colors cursor-pointer"
-              >
-                {/* Subject Icon */}
+            {subjectsMetadata.map((subj) => {
+              const count = stats.subjects[subj.id]?.count ?? 0;
+              const score = stats.subjects[subj.id]?.score ?? 0;
+
+              return (
                 <div
-                  className={`w-10 h-10 rounded-2xl ${subj.bgColor} flex items-center justify-center shrink-0 border border-slate-100`}
+                  key={subj.id}
+                  className="flex items-center gap-3 sm:gap-4 py-1.5 hover:bg-slate-50/80 -mx-2 px-2 rounded-2xl transition-colors cursor-pointer"
                 >
-                  {subj.iconType === "text" && (
-                    <span
-                      className={`text-xs font-black ${subj.iconColor} tracking-wider`}
-                    >
-                      {subj.iconText}
+                  {/* Subject Icon */}
+                  <div
+                    className={`w-10 h-10 rounded-2xl ${subj.bgColor} flex items-center justify-center shrink-0 border border-slate-100`}
+                  >
+                    {subj.iconType === "text" && (
+                      <span
+                        className={`text-xs font-black ${subj.iconColor} tracking-wider`}
+                      >
+                        {subj.iconText}
+                      </span>
+                    )}
+                    {subj.iconType === "brain" && (
+                      <Brain className={`w-5 h-5 ${subj.iconColor}`} />
+                    )}
+                    {subj.iconType === "laptop" && (
+                      <Laptop className={`w-5 h-5 ${subj.iconColor}`} />
+                    )}
+                    {subj.iconType === "scale" && (
+                      <Scale className={`w-5 h-5 ${subj.iconColor}`} />
+                    )}
+                    {subj.iconType === "globe" && (
+                      <Globe className={`w-5 h-5 ${subj.iconColor}`} />
+                    )}
+                  </div>
+
+                  {/* Subject Title & Count */}
+                  <div className="w-28 sm:w-36 shrink-0">
+                    <h4 className="text-sm font-bold text-slate-800 leading-tight truncate">
+                      {subj.name}
+                    </h4>
+                    <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                      {count} ครั้ง
+                    </p>
+                  </div>
+
+                  {/* Progress Bar Container */}
+                  <div className="flex-1 px-1">
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-[#BD1B0B] h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${score}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Percentage Score */}
+                  <div className="w-10 text-right shrink-0">
+                    <span className="text-xs sm:text-sm font-black text-[#BD1B0B]">
+                      {score}%
                     </span>
-                  )}
-                  {subj.iconType === "brain" && (
-                    <Brain className={`w-5 h-5 ${subj.iconColor}`} />
-                  )}
-                  {subj.iconType === "laptop" && (
-                    <Laptop className={`w-5 h-5 ${subj.iconColor}`} />
-                  )}
-                  {subj.iconType === "scale" && (
-                    <Scale className={`w-5 h-5 ${subj.iconColor}`} />
-                  )}
-                  {subj.iconType === "globe" && (
-                    <Globe className={`w-5 h-5 ${subj.iconColor}`} />
-                  )}
-                </div>
-
-                {/* Subject Title & Count */}
-                <div className="w-28 sm:w-36 shrink-0">
-                  <h4 className="text-sm font-bold text-slate-800 leading-tight truncate">
-                    {subj.name}
-                  </h4>
-                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                    {subj.count}
-                  </p>
-                </div>
-
-                {/* Progress Bar Container */}
-                <div className="flex-1 px-1">
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-[#BD1B0B] h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${subj.score}%` }}
-                    />
                   </div>
                 </div>
-
-                {/* Percentage Score */}
-                <div className="w-10 text-right shrink-0">
-                  <span className="text-xs sm:text-sm font-black text-[#BD1B0B]">
-                    {subj.score}%
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </main>
