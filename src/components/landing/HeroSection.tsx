@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Sparkles, ArrowRight, Shield, Award, Users, BookOpen, CheckCircle2, Clock } from "lucide-react";
+import { Sparkles, ArrowRight, Shield, Award, Users, BookOpen } from "lucide-react";
 
 interface HeroSectionProps {
   onOpenLogin: () => void;
@@ -123,23 +123,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Mobile Feature Highlights (Pill Badges) */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-2 sm:gap-4 max-w-2xl">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200/80 shadow-xs text-xs font-semibold text-slate-700">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-            <span>สายปราบปราม & อำนวยการ</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200/80 shadow-xs text-xs font-semibold text-slate-700">
-            <Clock className="w-3.5 h-3.5 text-blue-500" />
-            <span>จำลองเวลาสอบ 150 ข้อ</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200/80 shadow-xs text-xs font-semibold text-slate-700">
-            <Shield className="w-3.5 h-3.5 text-[#BD1B0B]" />
-            <span>หลักสูตร บช.ศ. ล่าสุด</span>
-          </div>
-        </div>
-
       </div>
     </section>
   );
