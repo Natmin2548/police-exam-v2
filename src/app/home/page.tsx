@@ -33,6 +33,7 @@ interface Recommendation {
 
 interface UserStats {
   userName?: string | null;
+  role?: string;
   completedSets: number;
   averageScore: number;
   maxScore: number;
@@ -121,6 +122,7 @@ export default function HomePage() {
   const [greeting, setGreeting] = useState("สวัสดีตอนบ่าย");
   const [activeTab, setActiveTab] = useState<"home" | "archive" | "rank">("home");
   const [stats, setStats] = useState<UserStats>(defaultStats);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
     // Load cached stats if available
@@ -369,13 +371,13 @@ export default function HomePage() {
                 </span>
               </div>
 
-              {/* Avatar Button */}
-              <div className="relative group">
+              {/* Avatar Button & Popup Panel (Matching Screenshot) */}
+              <div className="relative">
                 <button
                   type="button"
-                  onClick={handleLogout}
-                  title="คลิกเพื่อออกจากระบบ"
-                  className="w-10 h-10 rounded-full ring-2 ring-slate-100 overflow-hidden bg-slate-200 flex items-center justify-center hover:opacity-85 transition-opacity cursor-pointer shrink-0"
+                  onClick={() => setShowProfileMenu((prev) => !prev)}
+                  title="โปรไฟล์และเมนูจัดการ"
+                  className="w-10 h-10 rounded-full ring-2 ring-slate-100 overflow-hidden bg-slate-200 flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer shrink-0"
                 >
                   {avatarUrl ? (
                     <img
@@ -391,6 +393,73 @@ export default function HomePage() {
                     </div>
                   )}
                 </button>
+
+                {/* Profile Popup Menu */}
+                {showProfileMenu && (
+                  <>
+                    {/* Invisible Backdrop to close on click outside */}
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowProfileMenu(false)}
+                    />
+
+                    <div className="absolute right-0 top-12 z-50 w-64 sm:w-72 bg-white rounded-3xl p-5 shadow-2xl border border-slate-100/90 font-sans animate-in fade-in slide-in-from-top-2 duration-150">
+                      {/* User Info Header (Name in bold, email in gray) */}
+                      <div className="mb-3 px-1">
+                        <h4 className="text-base font-black text-slate-900 leading-tight">
+                          {displayName}
+                        </h4>
+                        <p className="text-xs text-slate-400 font-medium truncate mt-0.5">
+                          {user?.email || ""}
+                        </p>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="h-px bg-slate-100 my-2.5" />
+
+                      {/* Options List */}
+                      <div className="space-y-1">
+                        {/* 1. การแจ้งเตือน */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            alert("ไม่มีการแจ้งเตือนใหม่ในขณะนี้");
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold transition-colors cursor-pointer text-left"
+                        >
+                          <Bell className="w-4 h-4 text-slate-700 shrink-0" />
+                          <span>การแจ้งเตือน</span>
+                        </button>
+
+                        {/* 2. จัดการระบบ (Admin Panel) - ONLY visible if ADMIN */}
+                        {stats.role === "ADMIN" && (
+                          <Link
+                            href="/admin"
+                            onClick={() => setShowProfileMenu(false)}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-red-50/60 text-[#BD1B0B] text-xs sm:text-sm font-black transition-colors cursor-pointer"
+                          >
+                            <Shield className="w-4 h-4 text-[#BD1B0B] shrink-0" />
+                            <span>จัดการระบบ (Admin Panel)</span>
+                          </Link>
+                        )}
+
+                        {/* 3. ออกจากระบบ */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            handleLogout();
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold transition-colors cursor-pointer text-left"
+                        >
+                          <LogOut className="w-4 h-4 text-slate-700 shrink-0" />
+                          <span>ออกจากระบบ</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

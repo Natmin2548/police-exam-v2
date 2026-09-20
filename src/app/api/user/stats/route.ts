@@ -31,6 +31,7 @@ export async function GET(request: Request) {
         scoreLaw: true,
         scoreSocial: true,
         scoreEnglish: true,
+        role: true,
       },
     });
 
@@ -213,6 +214,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       userName,
+      role: dbUser.role || "USER",
       completedSets,
       averageScore,
       maxScore,
