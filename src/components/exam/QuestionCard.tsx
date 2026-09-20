@@ -24,13 +24,13 @@ function parseQuestionContent(text: string) {
   const cleanText = text.trim();
 
   const instructionRegex =
-    /^(อ่าน(?:บทความ|ข้อความ|เนื้อหา)?(?:ต่อไปนี้)?(?:แล้วตอบคำถาม)?[:\s]*|จงอ่าน(?:บทความ|ข้อความ)?(?:ต่อไปนี้)?[:\s]*|Read the following(?: passage)?[^\n]*:?)\s*\n+/i;
+    /^(อ่าน(?:บทความ|ข้อความ|เนื้อหา)?(?:ต่อไปนี้)?(?:แล้วตอบคำถาม)?[:\s]*|จงอ่าน(?:บทความ|ข้อความ)?(?:ต่อไปนี้)?[:\s]*|Read the following(?: passage)?[^\n]*:?)\s*/i;
 
   let instruction: string | null = null;
   let remaining = cleanText;
 
   const instrMatch = cleanText.match(instructionRegex);
-  if (instrMatch) {
+  if (instrMatch && instrMatch[1].trim().length > 3) {
     instruction = instrMatch[1].trim();
     remaining = cleanText.slice(instrMatch[0].length).trim();
   }
