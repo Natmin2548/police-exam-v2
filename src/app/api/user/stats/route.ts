@@ -74,30 +74,50 @@ export async function GET(request: Request) {
       orderBy: { createdAt: "desc" },
     });
 
-    // Compute subject counts from attempts
-    let countThai = 0;
-    let countGeneral = 0;
-    let countCom = 0;
-    let countLaw = 0;
-    let countSocial = 0;
-    let countEng = 0;
+    // Compute subject counts and scores from attempts
+    const subjectAttempts: Record<string, number[]> = {
+      thai: [],
+      math: [],
+      com: [],
+      law: [],
+      social: [],
+      eng: [],
+    };
 
     attempts.forEach((a) => {
       const text = `${a.subject || ""} ${a.setTitle || ""}`.toLowerCase();
-      if (text.includes("ไทย")) countThai++;
-      else if (text.includes("ทั่วไป") || text.includes("คณิต") || text.includes("เหตุผล")) countGeneral++;
-      else if (text.includes("คอม") || text.includes("ไอที") || text.includes("เทคโนโลยี")) countCom++;
-      else if (text.includes("กฎหมาย") || text.includes("กม")) countLaw++;
-      else if (text.includes("สังคม") || text.includes("จริยธรรม")) countSocial++;
-      else if (text.includes("อังกฤษ") || text.includes("english")) countEng++;
+      const score = typeof a.scorePct === "number" ? a.scorePct : 0;
+      if (text.includes("ไทย")) subjectAttempts.thai.push(score);
+      else if (text.includes("ทั่วไป") || text.includes("คณิต") || text.includes("เหตุผล")) subjectAttempts.math.push(score);
+      else if (text.includes("คอม") || text.includes("ไอที") || text.includes("เทคโนโลยี")) subjectAttempts.com.push(score);
+      else if (text.includes("กฎหมาย") || text.includes("กฏหมาย") || text.includes("กม")) subjectAttempts.law.push(score);
+      else if (text.includes("สังคม") || text.includes("จริยธรรม")) subjectAttempts.social.push(score);
+      else if (text.includes("อังกฤษ") || text.includes("english") || text.includes("eng")) subjectAttempts.eng.push(score);
     });
 
-    const scoreThai = dbUser.scoreThai || 0;
-    const scoreGeneral = dbUser.scoreGeneral || 0;
-    const scoreCom = dbUser.scoreComputer || 0;
-    const scoreLaw = dbUser.scoreLaw || 0;
-    const scoreSocial = dbUser.scoreSocial || 0;
-    const scoreEng = dbUser.scoreEnglish || 0;
+    const getSubjectStats = (scores: number[], fallback: number) => {
+      const count = scores.length;
+      if (count > 0) {
+        // Average score of all attempts in this subject
+        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / count);
+        return { count, score: avg };
+      }
+      return { count: fallback > 0 ? 1 : 0, score: fallback || 0 };
+    };
+
+    const thaiStat = getSubjectStats(subjectAttempts.thai, dbUser.scoreThai);
+    const mathStat = getSubjectStats(subjectAttempts.math, dbUser.scoreGeneral);
+    const comStat = getSubjectStats(subjectAttempts.com, dbUser.scoreComputer);
+    const lawStat = getSubjectStats(subjectAttempts.law, dbUser.scoreLaw);
+    const socialStat = getSubjectStats(subjectAttempts.social, dbUser.scoreSocial);
+    const engStat = getSubjectStats(subjectAttempts.eng, dbUser.scoreEnglish);
+
+    const scoreThai = thaiStat.score;
+    const scoreGeneral = mathStat.score;
+    const scoreCom = comStat.score;
+    const scoreLaw = lawStat.score;
+    const scoreSocial = socialStat.score;
+    const scoreEng = engStat.score;
 
     const scoresList = [scoreThai, scoreGeneral, scoreCom, scoreLaw, scoreSocial, scoreEng];
     const nonZeroScores = scoresList.filter((s) => s > 0);
@@ -199,12 +219,12 @@ export async function GET(request: Request) {
       incorrectCount,
       recommendation,
       subjects: {
-        thai: { count: countThai > 0 ? countThai : scoreThai > 0 ? 1 : 0, score: scoreThai },
-        math: { count: countGeneral > 0 ? countGeneral : scoreGeneral > 0 ? 1 : 0, score: scoreGeneral },
-        com: { count: countCom > 0 ? countCom : scoreCom > 0 ? 1 : 0, score: scoreCom },
-        law: { count: countLaw > 0 ? countLaw : scoreLaw > 0 ? 1 : 0, score: scoreLaw },
-        social: { count: countSocial > 0 ? countSocial : scoreSocial > 0 ? 1 : 0, score: scoreSocial },
-        eng: { count: countEng > 0 ? countEng : scoreEng > 0 ? 1 : 0, score: scoreEng },
+        thai: thaiStat,
+        math: mathStat,
+        com: comStat,
+        law: lawStat,
+        social: socialStat,
+        eng: engStat,
       },
     }, {
       headers: {

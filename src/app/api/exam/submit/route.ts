@@ -96,7 +96,59 @@ export async function POST(request: Request) {
           },
         });
 
-        // 2. Record incorrect questions for Spaced Repetition Review
+        // 2. Update user subject score in User model
+        const subStr = `${subject || ""} ${setTitle || ""}`.toLowerCase();
+        const updateData: any = {};
+
+        if (subStr.includes("pretest") || totalQuestions >= 100) {
+          // In a pretest, calculate score per category
+          const categoryCounts: Record<string, { correct: number; total: number }> = {};
+          detailedResults.forEach((r) => {
+            const cat = (r.category || "").toLowerCase();
+            let key = "";
+            if (cat.includes("ไทย")) key = "scoreThai";
+            else if (cat.includes("ทั่วไป") || cat.includes("คณิต") || cat.includes("เหตุผล")) key = "scoreGeneral";
+            else if (cat.includes("คอม") || cat.includes("ไอที")) key = "scoreComputer";
+            else if (cat.includes("กฎหมาย") || cat.includes("กฏหมาย")) key = "scoreLaw";
+            else if (cat.includes("สังคม")) key = "scoreSocial";
+            else if (cat.includes("อังกฤษ")) key = "scoreEnglish";
+            else if (cat.includes("สารบรรณ") || cat.includes("๕๔") || cat.includes("54")) key = "scoreSecretariat";
+
+            if (key) {
+              if (!categoryCounts[key]) categoryCounts[key] = { correct: 0, total: 0 };
+              categoryCounts[key].total++;
+              if (r.isCorrect) categoryCounts[key].correct++;
+            }
+          });
+
+          Object.entries(categoryCounts).forEach(([k, v]) => {
+            if (v.total > 0) {
+              updateData[k] = Math.round((v.correct / v.total) * 100);
+            }
+          });
+        } else {
+          // Single subject test
+          if (subStr.includes("ไทย")) updateData.scoreThai = scorePct;
+          else if (subStr.includes("ทั่วไป") || subStr.includes("คณิต") || subStr.includes("เหตุผล")) updateData.scoreGeneral = scorePct;
+          else if (subStr.includes("คอม") || subStr.includes("ไอที") || subStr.includes("เทคโนโลยี")) updateData.scoreComputer = scorePct;
+          else if (subStr.includes("กฎหมาย") || subStr.includes("กฏหมาย") || subStr.includes("กม")) updateData.scoreLaw = scorePct;
+          else if (subStr.includes("สังคม") || subStr.includes("จริยธรรม")) updateData.scoreSocial = scorePct;
+          else if (subStr.includes("อังกฤษ") || subStr.includes("english") || subStr.includes("eng")) updateData.scoreEnglish = scorePct;
+          else if (subStr.includes("สารบรรณ") || subStr.includes("๕๔") || subStr.includes("54")) updateData.scoreSecretariat = scorePct;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          try {
+            await prisma.user.update({
+              where: { id: dbUser.id },
+              data: updateData,
+            });
+          } catch (err) {
+            console.error("Error updating user subject scores:", err);
+          }
+        }
+
+        // 3. Record incorrect questions for Spaced Repetition Review
         for (const wrongId of wrongQuestionIds) {
           try {
             await prisma.incorrectQuestion.upsert({
