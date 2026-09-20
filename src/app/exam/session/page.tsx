@@ -91,10 +91,13 @@ function ExamSessionContent() {
       setError("");
       try {
         const count = mode.startsWith("pretest") ? "150" : "30";
+        const setIds = searchParams.get("setIds") || "";
         const res = await fetch(
           `/api/exam/generate?mode=${encodeURIComponent(
             mode
-          )}&category=${encodeURIComponent(category)}&count=${count}`
+          )}&category=${encodeURIComponent(category)}&count=${count}&setIds=${encodeURIComponent(
+            setIds
+          )}`
         );
         if (!res.ok) {
           throw new Error("ไม่สามารถโหลดข้อสอบได้ กรุณาลองใหม่อีกครั้ง");

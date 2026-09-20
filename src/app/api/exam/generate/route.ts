@@ -152,6 +152,41 @@ export async function GET(request: Request) {
         const sampled = sampleRandom(pool, dist.count);
         selectedQuestions.push(...sampled);
       }
+    } else if (mode === "chapter") {
+      // Chapter exam from specific ExamSets
+      const setIdsParam = searchParams.get("setIds");
+      const ids = setIdsParam
+        ? setIdsParam
+            .split(",")
+            .map((id) => parseInt(id, 10))
+            .filter((n) => !isNaN(n))
+        : [];
+
+      if (ids.length > 0) {
+        const chapterQuestions = await prisma.question.findMany({
+          where: {
+            examSetId: { in: ids },
+          },
+          select: {
+            id: true,
+            questionText: true,
+            choice1: true,
+            choice2: true,
+            choice3: true,
+            choice4: true,
+            correctAnswer: true,
+            explanation: true,
+            examSet: {
+              select: {
+                category: true,
+                title: true,
+              },
+            },
+          },
+          orderBy: { id: "asc" },
+        });
+        selectedQuestions = chapterQuestions;
+      }
     }
 
     // Format final list for client

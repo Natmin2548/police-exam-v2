@@ -328,17 +328,12 @@ export default function HomePage() {
             >
               หน้าหลัก
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("archive")}
-              className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "archive"
-                  ? "bg-white text-[#BD1B0B] shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
+            <Link
+              href="/archive"
+              className="px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-slate-600 hover:text-slate-900"
             >
               คลังข้อสอบ
-            </button>
+            </Link>
             <button
               type="button"
               onClick={() => setActiveTab("rank")}
@@ -441,7 +436,7 @@ export default function HomePage() {
 
               {/* Card 2: คลังรายบท */}
               <Link
-                href="/exam/category"
+                href="/archive"
                 className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer block"
               >
                 <h3 className="text-base font-black text-slate-900 mb-0.5">
@@ -748,16 +743,13 @@ export default function HomePage() {
         </button>
 
         {/* Nav Item 2: คลัง */}
-        <button
-          type="button"
-          onClick={() => setActiveTab("archive")}
-          className={`flex flex-col items-center gap-0.5 transition-colors cursor-pointer ${
-            activeTab === "archive" ? "text-[#BD1B0B]" : "text-slate-400 hover:text-slate-600"
-          }`}
+        <Link
+          href="/archive"
+          className="flex flex-col items-center gap-0.5 transition-colors cursor-pointer text-slate-400 hover:text-slate-600"
         >
           <BookMarked className="w-5 h-5" />
           <span className="text-[10px] font-bold">คลัง</span>
-        </button>
+        </Link>
 
         {/* Nav Item 3: อันดับ */}
         <button
