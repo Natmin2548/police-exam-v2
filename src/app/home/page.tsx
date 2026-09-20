@@ -126,7 +126,12 @@ export default function HomePage() {
     try {
       const saved = localStorage.getItem("police_exam_user_stats");
       if (saved) {
-        setStats(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setStats((prev) => ({
+          ...prev,
+          ...parsed,
+          recommendation: parsed.recommendation || prev.recommendation,
+        }));
       }
     } catch {
       // default clean stats
