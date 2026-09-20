@@ -23,10 +23,20 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
+interface Recommendation {
+  badge: string;
+  title: string;
+  description: string;
+  buttonText: string;
+  actionUrl: string;
+}
+
 interface UserStats {
   completedSets: number;
   averageScore: number;
   maxScore: number;
+  incorrectCount?: number;
+  recommendation?: Recommendation;
   subjects: {
     [key: string]: {
       count: number;
@@ -39,6 +49,14 @@ const defaultStats: UserStats = {
   completedSets: 0,
   averageScore: 0,
   maxScore: 0,
+  incorrectCount: 0,
+  recommendation: {
+    badge: "คำแนะนำวันนี้",
+    title: "ฝึกทำข้อสอบสายอำนวยการ",
+    description: "ตะลุยโจทย์ย้อนหลังชุดข้อสอบจริง 150 ข้อ จับเวลาจริงเพื่อฝึกสปีดความเร็ว",
+    buttonText: "เริ่มทำข้อสอบทันที",
+    actionUrl: "/exam/mock",
+  },
   subjects: {
     thai: { count: 0, score: 0 },
     math: { count: 0, score: 0 },
@@ -638,23 +656,25 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Desktop Card 3: Quick Action (ข้อสอบแนะนำ) */}
+            {/* Desktop Card 3: Quick Action (ข้อสอบแนะนำ Smart Recommendation) */}
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-6 shadow-xl shadow-slate-900/10">
               <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-red-400 mb-2">
                 <Flame className="w-3.5 h-3.5" />
-                <span>คำแนะนำวันนี้</span>
+                <span>{stats.recommendation?.badge || "คำแนะนำวันนี้"}</span>
               </div>
-              <h3 className="text-base font-black mb-1">ฝึกทำข้อสอบสายอำนวยการ</h3>
+              <h3 className="text-base font-black mb-1">
+                {stats.recommendation?.title || "ฝึกทำข้อสอบสายอำนวยการ"}
+              </h3>
               <p className="text-xs text-slate-300 font-medium leading-relaxed mb-4">
-                ตะลุยโจทย์ย้อนหลังชุดข้อสอบจริง 150 ข้อ จับเวลาจริงเพื่อฝึกสปีดความเร็ว
+                {stats.recommendation?.description || "ตะลุยโจทย์ย้อนหลังชุดข้อสอบจริง 150 ข้อ จับเวลาจริงเพื่อฝึกสปีดความเร็ว"}
               </p>
-              <button
-                type="button"
+              <Link
+                href={stats.recommendation?.actionUrl || "/exam/mock"}
                 className="w-full py-3 px-4 bg-[#BD1B0B] hover:bg-[#A81507] text-white text-xs font-black rounded-xl shadow-md shadow-red-950/20 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <span>เริ่มทำข้อสอบทันที</span>
+                <span>{stats.recommendation?.buttonText || "เริ่มทำข้อสอบทันที"}</span>
                 <ChevronRight className="w-4 h-4" />
-              </button>
+              </Link>
             </div>
           </div>
         </div>

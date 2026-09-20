@@ -100,10 +100,81 @@ export async function GET(request: Request) {
 
     const completedSets = attempts.length > 0 ? attempts.length : nonZeroScores.length;
 
+    // Check incorrect questions count for Spaced Repetition Review
+    const incorrectCount = await prisma.incorrectQuestion.count({
+      where: {
+        userId: dbUser.id,
+        isMastered: false,
+      },
+    });
+
+    // Compute Smart Priority Waterfall Recommendation
+    let recommendation = {
+      badge: "คำแนะนำวันนี้",
+      title: "ฝึกทำข้อสอบสายอำนวยการ",
+      description: "ตะลุยโจทย์ย้อนหลังชุดข้อสอบจริง 150 ข้อ จับเวลาจริงเพื่อฝึกสปีดความเร็ว",
+      buttonText: "เริ่มทำข้อสอบทันที",
+      actionUrl: "/exam/mock",
+    };
+
+    if (completedSets === 0 && nonZeroScores.length === 0) {
+      // Priority 1: New user (0 completed exams)
+      recommendation = {
+        badge: "เริ่มต้นครั้งแรก",
+        title: "ทดสอบวัดระดับครั้งแรก (Pretest 150 ข้อ)",
+        description: "ลองทำข้อสอบเสมือนจริง 1 ชุด เพื่อให้ระบบช่วยวิเคราะห์ว่าคุณเก่งวิชาไหน และต้องเสริมวิชาไหน",
+        buttonText: "เริ่มทำข้อสอบชุดแรก",
+        actionUrl: "/exam/mock",
+      };
+    } else if (incorrectCount > 0) {
+      // Priority 2: Has incorrect questions to review
+      recommendation = {
+        badge: `ทบทวนข้อผิดพลาด (${incorrectCount} ข้อ)`,
+        title: `ทบทวนข้อสอบที่เคยตอบผิด ${incorrectCount} ข้อ`,
+        description: "คุณมีข้อสอบที่เคยตอบผิดค้างอยู่ การแก้ข้อที่เคยผิดคือวิธีที่ช่วยดันคะแนนขึ้นได้ไวที่สุด",
+        buttonText: "ฝึกแก้ข้อที่เคยผิด",
+        actionUrl: "/exam/review",
+      };
+    } else {
+      // Priority 3: Check for subjects with score < 60%
+      const subjectsList = [
+        { id: "thai", name: "ภาษาไทย", score: scoreThai },
+        { id: "math", name: "ความสามารถทั่วไป", score: scoreGeneral },
+        { id: "com", name: "คอมพิวเตอร์", score: scoreCom },
+        { id: "law", name: "กฎหมาย", score: scoreLaw },
+        { id: "social", name: "สังคม", score: scoreSocial },
+        { id: "eng", name: "ภาษาอังกฤษ", score: scoreEng },
+      ];
+
+      // Sort by score ascending to find weakest subject
+      const lowest = [...subjectsList].sort((a, b) => a.score - b.score)[0];
+
+      if (lowest && lowest.score < 60) {
+        recommendation = {
+          badge: "เน้นแก้จุดอ่อนด่วน",
+          title: `เจาะลึกวิชา${lowest.name}`,
+          description: `คะแนนวิชานี้อยู่ที่ ${lowest.score}% ยังไม่ผ่านเกณฑ์ 60% แนะนำให้เน้นตะลุยโจทย์หมวดนี้เพื่อไม่ให้ตกเกณฑ์`,
+          buttonText: `เริ่มฝึกวิชา${lowest.name}`,
+          actionUrl: `/exam/category/${lowest.id}`,
+        };
+      } else {
+        // Priority 4: All >= 60%
+        recommendation = {
+          badge: "คะแนนผ่านเกณฑ์แล้ว",
+          title: "ฝึกจับเวลาสปีด 3 ชั่วโมงเต็ม",
+          description: "คะแนนของคุณอยู่ในเกณฑ์ดีแล้ว ลองฝึกจับเวลา 150 ข้อเพื่อฝึกความเร็วและไต่อันดับท็อปของประเทศ",
+          buttonText: "เข้าสอบจับเวลาจริง",
+          actionUrl: "/exam/mock",
+        };
+      }
+    }
+
     return NextResponse.json({
       completedSets,
       averageScore,
       maxScore,
+      incorrectCount,
+      recommendation,
       subjects: {
         thai: { count: countThai > 0 ? countThai : scoreThai > 0 ? 1 : 0, score: scoreThai },
         math: { count: countGeneral > 0 ? countGeneral : scoreGeneral > 0 ? 1 : 0, score: scoreGeneral },
