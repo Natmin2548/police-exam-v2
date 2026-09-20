@@ -398,38 +398,26 @@ export default function HomePage() {
           {/* Left Column (8 Columns on PC) */}
           <div className="lg:col-span-8 space-y-6">
             
-            {/* Banner: Pretest 150 ข้อ */}
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#BD1B0B] via-[#BD1B0B] to-[#991408] text-white p-6 sm:p-8 shadow-xl shadow-red-900/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer hover:shadow-2xl hover:scale-[1.005] transition-all group">
-              <div className="space-y-2 max-w-xl">
-                <div className="inline-flex items-center gap-1.5 bg-white/15 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide backdrop-blur-xs">
-                  <Sparkles className="w-3.5 h-3.5 text-red-200" />
-                  <span>ระบบสอบจำลองเสมือนจริง 2569</span>
-                </div>
-                <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
+            {/* Banner: Pretest 150 ข้อ (Simple & Clean like original) */}
+            <div className="relative overflow-hidden rounded-3xl bg-[#BD1B0B] text-white p-6 sm:p-8 shadow-xl shadow-red-900/10 flex items-center justify-between cursor-pointer hover:shadow-2xl transition-shadow group">
+              <div className="space-y-1">
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
                   Pretest 150 ข้อ
                 </h1>
-                <p className="text-xs sm:text-sm text-red-100/90 font-medium leading-relaxed">
-                  สายปราบปราม และ สายอำนวยการ | จับเวลาจริง 3 ชั่วโมง ตรวจคำตอบและวิเคราะห์ผลทันที
+                <p className="text-xs sm:text-sm text-white/80 font-medium">
+                  สายปราบปราม และ สายอำนวยการ
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 self-end sm:self-center">
-                <span className="hidden sm:inline-block text-xs font-black text-white/90 bg-white/10 px-4 py-2.5 rounded-2xl">
-                  เริ่มทำข้อสอบ
-                </span>
-                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center group-hover:bg-white group-hover:text-[#BD1B0B] transition-all shrink-0 shadow-xs">
-                  <ChevronRight className="w-6 h-6" />
-                </div>
+              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white group-hover:text-[#BD1B0B] transition-colors shrink-0">
+                <ChevronRight className="w-6 h-6" />
               </div>
             </div>
 
-            {/* 4 Feature Cards (2x2 on Mobile, 4 columns on PC) */}
+            {/* 4 Feature Cards (Simple & Clean 2x2 on Mobile, 4 columns on PC) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {/* Card 1: บีบอัดรูป */}
-              <div className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group">
-                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <ImageIcon className="w-4 h-4" />
-                </div>
+              <div className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer">
                 <h3 className="text-base font-black text-slate-900 mb-0.5">
                   บีบอัดรูป
                 </h3>
@@ -437,10 +425,7 @@ export default function HomePage() {
               </div>
 
               {/* Card 2: คลังรายบท */}
-              <div className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group">
-                <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <BookOpen className="w-4 h-4" />
-                </div>
+              <div className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer">
                 <h3 className="text-base font-black text-slate-900 mb-0.5">
                   คลังรายบท
                 </h3>
@@ -448,10 +433,7 @@ export default function HomePage() {
               </div>
 
               {/* Card 3: อันดับ */}
-              <div className="bg-white border border-slate-100 hover:border-red-200 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group">
-                <div className="w-8 h-8 rounded-xl bg-red-50 text-[#BD1B0B] flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <Trophy className="w-4 h-4" />
-                </div>
+              <div className="bg-white border border-slate-100 hover:border-red-200 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer">
                 <h3 className="text-base font-black text-[#BD1B0B] mb-0.5">
                   อันดับ
                 </h3>
@@ -459,10 +441,7 @@ export default function HomePage() {
               </div>
 
               {/* Card 4: คลังคำศัพท์ */}
-              <div className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group">
-                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                  <BookMarked className="w-4 h-4" />
-                </div>
+              <div className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer">
                 <h3 className="text-base font-black text-slate-900 mb-0.5">
                   คลังคำศัพท์
                 </h3>
@@ -470,9 +449,9 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Section: สถิติ (Shown on Mobile only - keep exact mobile placement) */}
+            {/* Section: สถิติ (Shown on Mobile only - clean & simple) */}
             <div className="lg:hidden">
-              <h2 className="text-base font-black text-slate-900 mb-3 px-5 sm:px-6">สถิติ</h2>
+              <h2 className="text-base font-black text-slate-900 mb-3 px-1 sm:px-2">สถิติ</h2>
               <div className="grid grid-cols-3 gap-3">
                 {/* Stat 1: ทำแล้ว */}
                 <div className="bg-white border border-slate-200/80 rounded-2xl h-24 px-2 text-center shadow-xs flex flex-col items-center justify-center">
@@ -515,17 +494,9 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Section: รายวิชา */}
-            <div className="bg-white border border-slate-100 rounded-3xl p-5 sm:p-7 shadow-xs">
-              <div className="flex items-center justify-between mb-5">
-                <div>
-                  <h2 className="text-lg font-black text-slate-900">รายวิชา</h2>
-                  <p className="text-xs text-slate-500 font-medium">วิเคราะห์คะแนนและความแม่นยำแยกตาม 6 หมวดวิชา</p>
-                </div>
-                <span className="text-xs font-bold text-[#BD1B0B] bg-red-50 px-3 py-1.5 rounded-full border border-red-100">
-                  เกณฑ์ผ่าน 60%
-                </span>
-              </div>
+            {/* Section: รายวิชา (Clean & Minimal like original) */}
+            <div className="bg-white border border-slate-100 rounded-3xl p-5 sm:p-6 shadow-xs">
+              <h2 className="text-base font-black text-slate-900 mb-4">รายวิชา</h2>
 
               <div className="space-y-4">
                 {subjectsMetadata.map((subj) => {
@@ -535,11 +506,11 @@ export default function HomePage() {
                   return (
                     <div
                       key={subj.id}
-                      className="flex items-center gap-3 sm:gap-4 py-2 hover:bg-slate-50/80 -mx-2 px-3 rounded-2xl transition-colors cursor-pointer"
+                      className="flex items-center gap-3 sm:gap-4 py-1.5 hover:bg-slate-50/80 -mx-2 px-2 rounded-2xl transition-colors cursor-pointer"
                     >
                       {/* Subject Icon */}
                       <div
-                        className={`w-11 h-11 rounded-2xl ${subj.bgColor} flex items-center justify-center shrink-0 border border-slate-100`}
+                        className={`w-10 h-10 rounded-2xl ${subj.bgColor} flex items-center justify-center shrink-0 border border-slate-100`}
                       >
                         {subj.iconType === "text" && (
                           <span
@@ -563,7 +534,7 @@ export default function HomePage() {
                       </div>
 
                       {/* Subject Title & Count */}
-                      <div className="w-32 sm:w-44 shrink-0">
+                      <div className="w-28 sm:w-36 shrink-0">
                         <h4 className="text-sm font-bold text-slate-800 leading-tight truncate">
                           {subj.name}
                         </h4>
@@ -574,16 +545,16 @@ export default function HomePage() {
 
                       {/* Progress Bar Container */}
                       <div className="flex-1 px-1">
-                        <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                           <div
-                            className="bg-gradient-to-r from-[#BD1B0B] to-rose-500 h-2.5 rounded-full transition-all duration-500"
-                            style={{ width: `${Math.min(score, 100)}%` }}
+                            className="bg-[#BD1B0B] h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${score}%` }}
                           />
                         </div>
                       </div>
 
                       {/* Percentage Score */}
-                      <div className="w-12 text-right shrink-0">
+                      <div className="w-10 text-right shrink-0">
                         <span className="text-xs sm:text-sm font-black text-[#BD1B0B]">
                           {score}%
                         </span>
