@@ -695,24 +695,34 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Desktop Card 3: Quick Action (ข้อสอบแนะนำ Smart Recommendation) */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-6 shadow-xl shadow-slate-900/10">
-              <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-red-400 mb-2">
-                <Flame className="w-3.5 h-3.5" />
+            {/* Desktop Card 3: Quick Action (ข้อสอบแนะนำ Smart Recommendation - White & Red Highlight) */}
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-white to-red-50/60 border-2 border-red-500/30 rounded-3xl p-6 shadow-xl shadow-red-500/10 transition-all hover:border-red-500/50 hover:shadow-2xl hover:shadow-red-500/15">
+              {/* Ambient Red Glow */}
+              <div className="absolute -top-10 -right-10 w-28 h-28 bg-red-500/10 rounded-full blur-2xl pointer-events-none" />
+
+              {/* Highlight Badge */}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-red-100/90 text-[#BD1B0B] border border-red-200/80 shadow-2xs mb-3">
+                <Flame className="w-3.5 h-3.5 text-[#BD1B0B]" />
                 <span>{activeRecommendation.badge}</span>
               </div>
-              <h3 className="text-base font-black mb-1">
+
+              {/* Title */}
+              <h3 className="text-lg font-black text-slate-900 mb-1.5 tracking-tight">
                 {activeRecommendation.title}
               </h3>
-              <p className="text-xs text-slate-300 font-medium leading-relaxed mb-4">
+
+              {/* Description */}
+              <p className="text-xs text-slate-600 font-medium leading-relaxed mb-5">
                 {activeRecommendation.description}
               </p>
+
+              {/* Highlight Red Button */}
               <Link
                 href={activeRecommendation.actionUrl}
-                className="w-full py-3 px-4 bg-[#BD1B0B] hover:bg-[#A81507] text-white text-xs font-black rounded-xl shadow-md shadow-red-950/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-[#BD1B0B] to-[#D32F2F] hover:from-[#A81507] hover:to-[#BD1B0B] text-white text-xs font-black rounded-2xl shadow-lg shadow-red-600/25 hover:shadow-xl hover:shadow-red-600/35 transition-all cursor-pointer flex items-center justify-center gap-2 group"
               >
                 <span>{activeRecommendation.buttonText}</span>
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
           </div>
