@@ -276,10 +276,10 @@ function ExamSessionContent() {
         <h2 className="text-base font-black text-slate-900 mb-1">{error || "ไม่พบข้อสอบ"}</h2>
         <p className="text-xs text-slate-500 mb-5">ขออภัยในความไม่สะดวก กรุณาลองเลือกวิชาอื่น</p>
         <Link
-          href="/exam"
+          href="/home"
           className="py-2.5 px-6 bg-[#BD1B0B] text-white text-xs font-black rounded-xl"
         >
-          กลับไปเลือกข้อสอบ
+          กลับหน้าหลัก
         </Link>
       </div>
     );
@@ -822,7 +822,7 @@ function ExamSessionContent() {
               </button>
               <button
                 type="button"
-                onClick={() => router.push("/exam")}
+                onClick={() => router.push("/home")}
                 className="py-2.5 px-4 rounded-xl bg-[#BD1B0B] text-white text-xs font-black hover:bg-[#A81507] cursor-pointer"
               >
                 ยืนยันการออก
