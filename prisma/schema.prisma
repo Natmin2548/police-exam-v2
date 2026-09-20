@@ -9,87 +9,39 @@ generator client {
 }
 
 model User {
-  id                      Int                  @id @default(autoincrement())
-  username                String               @unique
-  email                   String               @unique
-  password                String
-  fullName                String               @default("")
-  role                    String               @default("USER")
-  emailVerified           Boolean              @default(false)
-  emailVerifyToken        String?
-  points                  Int                  @default(0)
-  level                   Int                  @default(1)
-  xp                      Int                  @default(0)
-  streak                  Int                  @default(1)
-  streakLastDate          DateTime?
-  battleWins              Int                  @default(0)
-  scoreGeneral            Int                  @default(0)
-  scoreThai               Int                  @default(0)
-  scoreEnglish            Int                  @default(0)
-  scoreComputer           Int                  @default(0)
-  scoreSocial             Int                  @default(0)
-  scoreSecretariat        Int                  @default(0)
-  scoreLaw                Int                  @default(0)
-  pigName                 String               @default("น้องหมูนำโชค")
-  pigLevel                Int                  @default(1)
-  pigXp                   Int                  @default(0)
-  pigHunger               Int                  @default(80)
-  pigThirst               Int                  @default(80)
-  pigSkin                 String               @default("default")
-  pigWeapon               String               @default("default")
-  pigPenLevel             Int                  @default(1)
-  pigUnlockedSkins        String               @default("default")
-  pigUnlockedWeapons      String               @default("default")
-  faceImage               String?              @db.Text
-  premiumUntil            DateTime?
-  aiGenCount              Int                  @default(0)
-  aiGenLastDate           DateTime?
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
-  stageProgress           UserStageProgress[]
-  examSets                ExamSet[]
-  premiumRequests         PremiumRequest[]
-  vocabRecords            VocabRecord[]
-  incorrectQuestions      IncorrectQuestion[]
-  wrongCategories         WrongCategory[]
-  bookmarks               Bookmark[]
-  reportedQuestions       ReportedQuestion[]
-  posts                   Post[]
-  comments                Comment[]
-  chatMessages            ChatMessage[]
-  createdGroups           Group[]              @relation("CreatedGroups")
-  groupMemberships        GroupMember[]
-  groupMessages           GroupChatMessage[]
-  friendsAsUser           Friend[]             @relation("UserFriends")
-  friendsAsFriend         Friend[]             @relation("FriendUsers")
-  blockedUsers            Block[]              @relation("BlockedByUser")
-  blockedBy               Block[]              @relation("BlockedUserUsers")
-  sentPrivateMessages     PrivateChatMessage[] @relation("SentPrivateMessages")
-  receivedPrivateMessages PrivateChatMessage[] @relation("ReceivedPrivateMessages")
-  supportTickets          SupportTicket[]
-  quizAttempts            QuizAttempt[]
-}
+  id               Int       @id @default(autoincrement())
+  username         String    @unique
+  email            String    @unique
+  password         String
+  fullName         String    @default("")
+  role             String    @default("USER")
+  emailVerified    Boolean   @default(false)
+  emailVerifyToken String?
+  streak           Int       @default(1)
+  streakLastDate   DateTime?
+  scoreGeneral     Int       @default(0)
+  scoreThai        Int       @default(0)
+  scoreEnglish     Int       @default(0)
+  scoreComputer    Int       @default(0)
+  scoreSocial      Int       @default(0)
+  scoreSecretariat Int       @default(0)
+  scoreLaw         Int       @default(0)
+  faceImage        String?   @db.Text
+  premiumUntil     DateTime?
+  aiGenCount       Int       @default(0)
+  aiGenLastDate    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-model Stage {
-  id        Int                 @id @default(autoincrement())
-  title     String
-  icon      String              @default("📝")
-  sortOrder Int                 @default(0)
-  createdAt DateTime            @default(now())
-  progress  UserStageProgress[]
-}
-
-model UserStageProgress {
-  id          Int       @id @default(autoincrement())
-  userId      Int
-  stageId     Int
-  completed   Boolean   @default(false)
-  score       Int       @default(0)
-  completedAt DateTime?
-  user        User      @relation(fields: [userId], references: [id])
-  stage       Stage     @relation(fields: [stageId], references: [id])
-
-  @@unique([userId, stageId])
+  examSets           ExamSet[]
+  premiumRequests    PremiumRequest[]
+  vocabRecords       VocabRecord[]
+  incorrectQuestions IncorrectQuestion[]
+  wrongCategories    WrongCategory[]
+  bookmarks          Bookmark[]
+  reportedQuestions  ReportedQuestion[]
+  supportTickets     SupportTicket[]
+  quizAttempts       QuizAttempt[]
 }
 
 model ExamSet {
@@ -125,19 +77,19 @@ model Question {
 
 model Announcement {
   id               Int      @id @default(autoincrement())
-  orgName          String // ชื่อหน่วยงานเต็ม เช่น กองบัญชาการศึกษา
-  orgAbbr          String // ตัวย่อหน่วยงาน เช่น บช.ศ.
-  jobTitle         String // สายงาน/รายละเอียดงาน เช่น กลุ่มสายงานอำนวยการและสนับสนุน ม.6/ปวช.
-  positionsCount   Int // จำนวนอัตรา เช่น 800
-  year             Int // ปี พ.ศ. เช่น 2569
-  announcementDate String   @default("") // วันที่ประกาศ
-  registerDate     String   @default("") // วันที่รับสมัคร
-  seatSelectDate   String   @default("") // วันที่เลือกที่นั่งสอบ
-  photoEditDate    String   @default("") // วันที่ให้แก้ไขรูปถ่าย
-  printCardDate    String   @default("") // วันพิมพ์บัตรประจำตัวสอบ
-  examDate         String   @default("") // วันสอบ
-  status           String   @default("เปิดรับสมัครล่าสุด") // สถานะประกาศ
-  link             String   @default("") // ลิงก์ต้นทางสมัครสอบ
+  orgName          String   // ชื่อหน่วยงานเต็ม เช่น กองบัญชาการศึกษา
+  orgAbbr          String   // ตัวย่อหน่วยงาน เช่น บช.ศ.
+  jobTitle         String   // สายงาน/รายละเอียดงาน
+  positionsCount   Int      // จำนวนอัตรา
+  year             Int      // ปี พ.ศ. เช่น 2569
+  announcementDate String   @default("")
+  registerDate     String   @default("")
+  seatSelectDate   String   @default("")
+  photoEditDate    String   @default("")
+  printCardDate    String   @default("")
+  examDate         String   @default("")
+  status           String   @default("เปิดรับสมัครล่าสุด")
+  link             String   @default("")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
@@ -157,7 +109,7 @@ model PremiumRequest {
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   slipImage String   @db.Text
-  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  status    String   @default("PENDING")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -166,8 +118,8 @@ model VocabRecord {
   id          Int      @id @default(autoincrement())
   userId      Int
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  level       String // A1, A2, B1, B2, C1
-  mode        String // same, trans
+  level       String
+  mode        String
   timeSeconds Int
   createdAt   DateTime @default(now())
 }
@@ -200,7 +152,7 @@ model SystemSetting {
 model WrongCategory {
   id        Int      @id @default(autoincrement())
   userId    Int
-  category  String // e.g. "general", "thai", "english", "computer", "social", "secretariat", "law"
+  category  String
   count     Int      @default(0)
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -211,7 +163,7 @@ model WrongCategory {
 model Bookmark {
   id            Int      @id @default(autoincrement())
   userId        Int
-  questionId    String // 'ai-gen-...' or numeric string
+  questionId    String
   questionText  String   @db.Text
   choice1       String   @db.Text
   choice2       String   @db.Text
@@ -237,108 +189,12 @@ model ReportedQuestion {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model Post {
-  id        Int       @id @default(autoincrement())
-  content   String    @db.Text
-  userId    Int
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
-  comments  Comment[]
-}
-
-model Comment {
-  id        Int      @id @default(autoincrement())
-  content   String   @db.Text
-  postId    Int
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-}
-
-model ChatMessage {
-  id        Int      @id @default(autoincrement())
-  content   String   @db.Text
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-}
-
-model Group {
-  id          Int                @id @default(autoincrement())
-  name        String
-  description String?            @db.Text
-  image       String?            @db.Text
-  isPrivate   Boolean            @default(false)
-  createdById Int
-  createdBy   User               @relation("CreatedGroups", fields: [createdById], references: [id], onDelete: Cascade)
-  createdAt   DateTime           @default(now())
-  members     GroupMember[]
-  messages    GroupChatMessage[]
-}
-
-model GroupMember {
-  id        Int      @id @default(autoincrement())
-  groupId   Int
-  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status    String   @default("ACCEPTED")
-  role      String   @default("MEMBER")
-  createdAt DateTime @default(now())
-
-  @@unique([groupId, userId])
-}
-
-model GroupChatMessage {
-  id        Int      @id @default(autoincrement())
-  content   String   @db.Text
-  groupId   Int
-  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-}
-
-model Friend {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  user      User     @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
-  friendId  Int
-  friend    User     @relation("FriendUsers", fields: [friendId], references: [id], onDelete: Cascade)
-  status    String   @default("ACCEPTED")
-  createdAt DateTime @default(now())
-
-  @@unique([userId, friendId])
-}
-
-model Block {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  user        User     @relation("BlockedByUser", fields: [userId], references: [id], onDelete: Cascade)
-  blockedId   Int
-  blockedUser User     @relation("BlockedUserUsers", fields: [blockedId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-
-  @@unique([userId, blockedId])
-}
-
-model PrivateChatMessage {
-  id         Int      @id @default(autoincrement())
-  content    String   @db.Text
-  senderId   Int
-  sender     User     @relation("SentPrivateMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiverId Int
-  receiver   User     @relation("ReceivedPrivateMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-}
-
 model SupportTicket {
   id        Int      @id @default(autoincrement())
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   message   String   @db.Text
-  status    String   @default("PENDING") // PENDING, READ, RESOLVED
+  status    String   @default("PENDING")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -350,21 +206,6 @@ model KnowledgeDocument {
   content   String   @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model BattleRoom {
-  id         Int      @id @default(autoincrement())
-  roomCode   String   @unique
-  hostId     Int
-  mode       String   @default("CUSTOM")
-  subject    String?
-  maxPlayers Int      @default(8)
-  status     String   @default("WAITING")
-  players    Json     @default("[]")
-  questions  Json     @default("[]")
-  scores     Json     @default("{}")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
 }
 
 model QuizAttempt {
