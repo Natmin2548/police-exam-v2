@@ -42,6 +42,7 @@ model User {
   reportedQuestions  ReportedQuestion[]
   supportTickets     SupportTicket[]
   quizAttempts       QuizAttempt[]
+  examSessions       ExamSession[]
 
   @@index([role])
 }
@@ -59,6 +60,8 @@ model ExamSet {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   questions   Question[]
+  mockExams   MockExam[]
+  examSessions ExamSession[]
 
   @@index([category, status])
   @@index([isPublic])
@@ -76,11 +79,20 @@ model Question {
   correctAnswer      Int
   explanation        String?             @db.Text
   sortOrder          Int                 @default(0)
+  difficulty         String              @default("MEDIUM") // EASY, MEDIUM, HARD
+  topic              String?             // เช่น "อนุกรม", "พ.ร.บ.ตำรวจ", "คำศัพท์"
+  subtopic           String?             // หัวข้อย่อย
+  imageUrl           String?             @db.Text // รูปภาพประกอบข้อสอบ
+  timesAnswered      Int                 @default(0)
+  timesCorrect       Int                 @default(0)
   createdAt          DateTime            @default(now())
   incorrectQuestions IncorrectQuestion[]
+  userAnswers        UserAnswer[]
 
   @@index([examSetId])
   @@index([sortOrder])
+  @@index([difficulty])
+  @@index([topic])
 }
 
 model Announcement {
@@ -123,25 +135,31 @@ model PremiumRequest {
 }
 
 model VocabRecord {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  level       String
-  mode        String
-  timeSeconds Int
-  createdAt   DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  level         String
+  mode          String
+  timeSeconds   Int
+  scorePct      Int      @default(0)
+  masteredWords Int      @default(0)
+  createdAt     DateTime @default(now())
 }
 
 model IncorrectQuestion {
-  id         Int      @id @default(autoincrement())
-  userId     Int
-  questionId Int
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
+  id             Int       @id @default(autoincrement())
+  userId         Int
+  questionId     Int
+  wrongCount     Int       @default(1)
+  isMastered     Boolean   @default(false)
+  lastReviewedAt DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question       Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
 
   @@unique([userId, questionId])
   @@index([userId])
+  @@index([isMastered])
 }
 
 model PasswordReset {
@@ -159,12 +177,12 @@ model SystemSetting {
 }
 
 model WrongCategory {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  category  String
-  count     Int      @default(0)
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  category    String
+  count       Int      @default(0)
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, category])
 }
@@ -233,4 +251,73 @@ model QuizAttempt {
   @@index([userId])
   @@index([userId, subject])
   @@index([createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// ระบบจำลองสนามสอบจริง (Mock Exam & Live Simulation)
+// -----------------------------------------------------------------------------
+model MockExam {
+  id               Int            @id @default(autoincrement())
+  title            String         // เช่น "Pre-Test นายสิบตำรวจ สายอำนวยการ ประจำปี 2569"
+  description      String?        @db.Text
+  targetBranch     String         @default("สายอำนวยการ") // สายอำนวยการ, ปราบปราม, พิสูจน์หลักฐาน
+  timeLimitMinutes Int            @default(180) // เวลาทำข้อสอบ 3 ชั่วโมง (180 นาที)
+  totalQuestions   Int            @default(150) // 150 ข้อเต็ม
+  passingScorePct  Int            @default(60)  // เกณฑ์ผ่าน 60%
+  startAt          DateTime?      // เวลาเปิดรอบสอบ
+  endAt            DateTime?      // เวลาปิดรอบสอบ
+  isLive           Boolean        @default(true) // เปิดให้ทำข้อสอบหรือไม่
+  examSetId        Int?
+  examSet          ExamSet?       @relation(fields: [examSetId], references: [id])
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  sessions         ExamSession[]
+
+  @@index([targetBranch, isLive])
+}
+
+// -----------------------------------------------------------------------------
+// บันทึกรอบการสอบจับเวลาจริงและผลการจัดอันดับ (Exam Session)
+// -----------------------------------------------------------------------------
+model ExamSession {
+  id               Int          @id @default(autoincrement())
+  userId           Int
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mockExamId       Int?
+  mockExam         MockExam?    @relation(fields: [mockExamId], references: [id])
+  examSetId        Int?
+  examSet          ExamSet?     @relation(fields: [examSetId], references: [id])
+  status           String       @default("IN_PROGRESS") // IN_PROGRESS, SUBMITTED, TIMEOUT
+  score            Int          @default(0) // คะแนนดิบที่ได้ (เช่น 115 จาก 150)
+  scorePct         Float        @default(0.0) // เปอร์เซ็นต์คะแนน (เช่น 76.67%)
+  passed           Boolean      @default(false) // ผ่านเกณฑ์หรือไม่
+  percentile       Float?       // อันดับเปอร์เซ็นไทล์เทียบกับผู้สอบทั่วประเทศ
+  rank             Int?         // อันดับที่ในรอบนั้น
+  timeSpentSeconds Int          @default(0) // เวลาที่ใช้ไปทั้งหมด
+  startedAt        DateTime     @default(now())
+  submittedAt      DateTime?
+  answers          UserAnswer[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([scorePct])
+}
+
+// -----------------------------------------------------------------------------
+// บันทึกคำตอบแต่ละข้อและเวลาที่ใช้ต่อข้อ (Item-level Analytics)
+// -----------------------------------------------------------------------------
+model UserAnswer {
+  id               Int         @id @default(autoincrement())
+  sessionId        Int
+  session          ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  questionId       Int
+  question         Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedChoice   Int         // ข้อที่ผู้ใช้เลือก (1, 2, 3, 4)
+  isCorrect        Boolean     // ถูกหรือผิด
+  timeSpentSeconds Int         @default(0) // เวลาที่ใช้ทำข้อนี้ (หน่วยวินาที)
+  createdAt        DateTime    @default(now())
+
+  @@unique([sessionId, questionId])
+  @@index([sessionId])
+  @@index([questionId])
 }
