@@ -170,6 +170,28 @@ export default function HomePage() {
     };
   }, []);
 
+  // Fetch real database statistics for the logged in user
+  useEffect(() => {
+    if (!user?.email) return;
+
+    const fetchUserStats = async () => {
+      try {
+        const res = await fetch(`/api/user/stats?email=${encodeURIComponent(user.email!)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.subjects) {
+            setStats(data);
+            localStorage.setItem("police_exam_user_stats", JSON.stringify(data));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load user stats from DB:", err);
+      }
+    };
+
+    fetchUserStats();
+  }, [user?.email]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.replace("/");
