@@ -56,7 +56,7 @@ const defaultStats: UserStats = {
     title: "ฝึกทำข้อสอบสายอำนวยการ",
     description: "ตะลุยโจทย์ย้อนหลังชุดข้อสอบจริง 150 ข้อ จับเวลาจริงเพื่อฝึกสปีดความเร็ว",
     buttonText: "เริ่มทำข้อสอบทันที",
-    actionUrl: "/exam/mock",
+    actionUrl: "/exam",
   },
   subjects: {
     thai: { count: 0, score: 0 },
@@ -214,12 +214,22 @@ export default function HomePage() {
       ];
       const lowest = [...subjectsList].sort((a, b) => a.score - b.score)[0];
       if (lowest && lowest.score < 60) {
+        const catMap: Record<string, string> = {
+          thai: "ภาษาไทย",
+          math: "ทั่วไป",
+          com: "คอม",
+          law: "กฏหมาย",
+          social: "สังคม",
+          eng: "ภาษาอังกฤษ",
+        };
         return {
           badge: "เน้นแก้จุดอ่อนด่วน",
           title: `เจาะลึกวิชา${lowest.name}`,
           description: `คะแนนวิชานี้อยู่ที่ ${lowest.score}% ยังไม่ผ่านเกณฑ์ 60% แนะนำให้เน้นตะลุยโจทย์หมวดนี้เพื่อไม่ให้ตกเกณฑ์`,
           buttonText: `เริ่มฝึกวิชา${lowest.name}`,
-          actionUrl: `/exam/category/${lowest.id}`,
+          actionUrl: `/exam/session?mode=subject_single&category=${encodeURIComponent(
+            catMap[lowest.id] || "ภาษาไทย"
+          )}&title=${encodeURIComponent("เจาะลึกวิชา" + lowest.name)}`,
         };
       }
     }
@@ -400,21 +410,24 @@ export default function HomePage() {
           {/* Left Column (8 Columns on PC) */}
           <div className="lg:col-span-8 space-y-6">
             
-            {/* Banner: Pretest 150 ข้อ (Simple & Clean like original) */}
-            <div className="relative overflow-hidden rounded-3xl bg-[#BD1B0B] text-white p-6 sm:p-8 shadow-xl shadow-red-900/10 flex items-center justify-between cursor-pointer hover:shadow-2xl transition-shadow group">
+            {/* Banner: Pretest 150 ข้อ (Matching Screenshot 1) */}
+            <Link
+              href="/exam"
+              className="relative overflow-hidden rounded-3xl bg-[#BD1B0B] text-white p-6 sm:p-7 shadow-lg shadow-red-950/15 flex items-center justify-between cursor-pointer hover:bg-[#A81507] hover:shadow-xl transition-all group block"
+            >
               <div className="space-y-1">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight">
                   Pretest 150 ข้อ
                 </h1>
                 <p className="text-xs sm:text-sm text-white/80 font-medium">
-                  สายปราบปราม และ สายอำนวยการ
+                  สายปราบปราม - สายอำนวยการ
                 </p>
               </div>
 
-              <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white group-hover:text-[#BD1B0B] transition-colors shrink-0">
-                <ChevronRight className="w-6 h-6" />
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white group-hover:text-[#BD1B0B] transition-colors shrink-0">
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-            </div>
+            </Link>
 
             {/* 4 Feature Cards (Simple & Clean 2x2 on Mobile, 4 columns on PC) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -427,15 +440,21 @@ export default function HomePage() {
               </div>
 
               {/* Card 2: คลังรายบท */}
-              <div className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer">
+              <Link
+                href="/exam/category"
+                className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer block"
+              >
                 <h3 className="text-base font-black text-slate-900 mb-0.5">
                   คลังรายบท
                 </h3>
                 <p className="text-xs text-slate-400 font-medium">เจาะทีละบท</p>
-              </div>
+              </Link>
 
               {/* Card 3: อันดับ */}
-              <div className="bg-white border border-slate-100 hover:border-red-200 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer">
+              <div
+                onClick={() => setActiveTab("rank")}
+                className="bg-white border border-slate-100 hover:border-red-200 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer"
+              >
                 <h3 className="text-base font-black text-[#BD1B0B] mb-0.5">
                   อันดับ
                 </h3>
@@ -504,11 +523,23 @@ export default function HomePage() {
                 {subjectsMetadata.map((subj) => {
                   const count = stats.subjects[subj.id]?.count ?? 0;
                   const score = stats.subjects[subj.id]?.score ?? 0;
+                  const catMap: Record<string, string> = {
+                    thai: "ภาษาไทย",
+                    math: "ทั่วไป",
+                    com: "คอม",
+                    law: "กฏหมาย",
+                    social: "สังคม",
+                    eng: "ภาษาอังกฤษ",
+                  };
+                  const targetCat = catMap[subj.id] || "ภาษาไทย";
 
                   return (
-                    <div
+                    <Link
                       key={subj.id}
-                      className="flex items-center gap-3 sm:gap-4 py-1.5 hover:bg-slate-50/80 -mx-2 px-2 rounded-2xl transition-colors cursor-pointer"
+                      href={`/exam/session?mode=subject_single&category=${encodeURIComponent(
+                        targetCat
+                      )}&title=${encodeURIComponent("ทำข้อสอบ " + subj.name + " 30 ข้อ")}`}
+                      className="flex items-center gap-3 sm:gap-4 py-1.5 hover:bg-slate-50/80 -mx-2 px-2 rounded-2xl transition-colors cursor-pointer block"
                     >
                       {/* Subject Icon */}
                       <div
@@ -561,7 +592,7 @@ export default function HomePage() {
                           {score}%
                         </span>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
