@@ -195,13 +195,47 @@ export default function HomePage() {
     };
   }, []);
 
+  // Derive active recommendation dynamically (ensures correct display even before fetch completes or if cached from older version)
+  const activeRecommendation = React.useMemo(() => {
+    if (stats.recommendation && stats.recommendation.title !== "ฝึกทำข้อสอบสายอำนวยการ") {
+      return stats.recommendation;
+    }
+
+    // If user has completed exams and has subjects with scores, identify weakest subject
+    if (stats.completedSets > 0 && stats.subjects) {
+      const subjectsList = [
+        { id: "thai", name: "ภาษาไทย", score: stats.subjects.thai?.score || 0 },
+        { id: "math", name: "ความสามารถทั่วไป", score: stats.subjects.math?.score || 0 },
+        { id: "com", name: "คอมพิวเตอร์", score: stats.subjects.com?.score || 0 },
+        { id: "law", name: "กฎหมาย", score: stats.subjects.law?.score || 0 },
+        { id: "social", name: "สังคม", score: stats.subjects.social?.score || 0 },
+        { id: "eng", name: "ภาษาอังกฤษ", score: stats.subjects.eng?.score || 0 },
+      ];
+      const lowest = [...subjectsList].sort((a, b) => a.score - b.score)[0];
+      if (lowest && lowest.score < 60) {
+        return {
+          badge: "เน้นแก้จุดอ่อนด่วน",
+          title: `เจาะลึกวิชา${lowest.name}`,
+          description: `คะแนนวิชานี้อยู่ที่ ${lowest.score}% ยังไม่ผ่านเกณฑ์ 60% แนะนำให้เน้นตะลุยโจทย์หมวดนี้เพื่อไม่ให้ตกเกณฑ์`,
+          buttonText: `เริ่มฝึกวิชา${lowest.name}`,
+          actionUrl: `/exam/category/${lowest.id}`,
+        };
+      }
+    }
+
+    return stats.recommendation || defaultStats.recommendation!;
+  }, [stats]);
+
   // Fetch real database statistics for the logged in user
   useEffect(() => {
     if (!user?.email) return;
 
     const fetchUserStats = async () => {
       try {
-        const res = await fetch(`/api/user/stats?email=${encodeURIComponent(user.email!)}`);
+        const res = await fetch(
+          `/api/user/stats?email=${encodeURIComponent(user.email!)}&_t=${Date.now()}`,
+          { cache: "no-store" }
+        );
         if (res.ok) {
           const data = await res.json();
           if (data && data.subjects) {
@@ -665,19 +699,19 @@ export default function HomePage() {
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-6 shadow-xl shadow-slate-900/10">
               <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-red-400 mb-2">
                 <Flame className="w-3.5 h-3.5" />
-                <span>{stats.recommendation?.badge || "คำแนะนำวันนี้"}</span>
+                <span>{activeRecommendation.badge}</span>
               </div>
               <h3 className="text-base font-black mb-1">
-                {stats.recommendation?.title || "ฝึกทำข้อสอบสายอำนวยการ"}
+                {activeRecommendation.title}
               </h3>
               <p className="text-xs text-slate-300 font-medium leading-relaxed mb-4">
-                {stats.recommendation?.description || "ตะลุยโจทย์ย้อนหลังชุดข้อสอบจริง 150 ข้อ จับเวลาจริงเพื่อฝึกสปีดความเร็ว"}
+                {activeRecommendation.description}
               </p>
               <Link
-                href={stats.recommendation?.actionUrl || "/exam/mock"}
+                href={activeRecommendation.actionUrl}
                 className="w-full py-3 px-4 bg-[#BD1B0B] hover:bg-[#A81507] text-white text-xs font-black rounded-xl shadow-md shadow-red-950/20 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <span>{stats.recommendation?.buttonText || "เริ่มทำข้อสอบทันที"}</span>
+                <span>{activeRecommendation.buttonText}</span>
                 <ChevronRight className="w-4 h-4" />
               </Link>
             </div>

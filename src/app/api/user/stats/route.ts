@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -30,11 +33,19 @@ export async function GET(request: Request) {
     });
 
     if (!dbUser) {
-      // User not in DB yet, return 0 stats
+      // User not in DB yet, return 0 stats with default initial recommendation
       return NextResponse.json({
         completedSets: 0,
         averageScore: 0,
         maxScore: 0,
+        incorrectCount: 0,
+        recommendation: {
+          badge: "เริ่มต้นครั้งแรก",
+          title: "ทดสอบวัดระดับครั้งแรก (Pretest 150 ข้อ)",
+          description: "ลองทำข้อสอบเสมือนจริง 1 ชุด เพื่อให้ระบบช่วยวิเคราะห์ว่าคุณเก่งวิชาไหน และต้องเสริมวิชาไหน",
+          buttonText: "เริ่มทำข้อสอบชุดแรก",
+          actionUrl: "/exam/mock",
+        },
         subjects: {
           thai: { count: 0, score: 0 },
           math: { count: 0, score: 0 },
@@ -42,6 +53,10 @@ export async function GET(request: Request) {
           law: { count: 0, score: 0 },
           social: { count: 0, score: 0 },
           eng: { count: 0, score: 0 },
+        },
+      }, {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
         },
       });
     }
@@ -182,6 +197,10 @@ export async function GET(request: Request) {
         law: { count: countLaw > 0 ? countLaw : scoreLaw > 0 ? 1 : 0, score: scoreLaw },
         social: { count: countSocial > 0 ? countSocial : scoreSocial > 0 ? 1 : 0, score: scoreSocial },
         eng: { count: countEng > 0 ? countEng : scoreEng > 0 ? 1 : 0, score: scoreEng },
+      },
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       },
     });
   } catch (error: any) {
