@@ -18,6 +18,73 @@ export interface QuestionCardProps {
   onSelectChoice?: (choiceIndex: number) => void;
 }
 
+function parseQuestionContent(text: string) {
+  if (!text) return { instruction: null, passage: null, question: "" };
+
+  const cleanText = text.trim();
+
+  const instructionRegex =
+    /^(อ่าน(?:บทความ|ข้อความ|เนื้อหา)?(?:ต่อไปนี้)?(?:แล้วตอบคำถาม)?[:\s]*|จงอ่าน(?:บทความ|ข้อความ)?(?:ต่อไปนี้)?[:\s]*|Read the following(?: passage)?[^\n]*:?)\s*\n+/i;
+
+  let instruction: string | null = null;
+  let remaining = cleanText;
+
+  const instrMatch = cleanText.match(instructionRegex);
+  if (instrMatch) {
+    instruction = instrMatch[1].trim();
+    remaining = cleanText.slice(instrMatch[0].length).trim();
+  }
+
+  const quoteMatch = remaining.match(/^["“]([\s\S]+?)["”]\s*([\s\S]*)$/);
+  if (quoteMatch) {
+    const passage = quoteMatch[1].trim();
+    const question = quoteMatch[2].trim();
+    if (instruction || passage.length >= 40) {
+      return {
+        instruction: instruction || "อ่านบทความต่อไปนี้แล้วตอบคำถาม:",
+        passage: `"${passage}"`,
+        question: question || (instruction ? "" : cleanText),
+      };
+    }
+  }
+
+  const parts = remaining.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const lastPart = parts[parts.length - 1];
+    if (
+      lastPart.includes("?") ||
+      lastPart.includes("ข้อใด") ||
+      lastPart.includes("คืออะไร") ||
+      lastPart.includes("เพราะเหตุใด") ||
+      lastPart.includes("หมายถึง") ||
+      lastPart.includes("ถูกต้อง") ||
+      lastPart.length < 150
+    ) {
+      const passageParts = parts.slice(0, parts.length - 1).join("\n\n");
+      if (instruction || passageParts.length >= 40) {
+        return {
+          instruction:
+            instruction ||
+            (passageParts.length > 60
+              ? "อ่านข้อความต่อไปนี้แล้วตอบคำถาม:"
+              : null),
+          passage:
+            passageParts.startsWith('"') || passageParts.startsWith("“")
+              ? passageParts
+              : `"${passageParts}"`,
+          question: lastPart,
+        };
+      }
+    }
+  }
+
+  return {
+    instruction: null,
+    passage: null,
+    question: cleanText,
+  };
+}
+
 export const QuestionCard: React.FC<QuestionCardProps> = ({
   questionNumber = 1,
   totalQuestions = 1,
@@ -59,10 +126,34 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
         )}
       </div>
 
-      {/* Question Text */}
-      <h2 className="text-base sm:text-lg md:text-xl font-bold text-slate-800 leading-relaxed mb-6">
-        {questionText}
-      </h2>
+      {/* Question Text & Passage */}
+      {(() => {
+        const parsed = parseQuestionContent(questionText);
+        if (parsed.passage) {
+          return (
+            <div className="space-y-3 mb-6">
+              {parsed.instruction && (
+                <p className="text-xs sm:text-sm font-bold text-slate-700 leading-snug">
+                  {parsed.instruction}
+                </p>
+              )}
+              <div className="rounded-2xl bg-[#F8FAFD] border border-blue-100/90 border-l-[5px] border-l-[#2563EB] p-4 sm:p-5 shadow-2xs">
+                <p className="text-slate-800 text-sm sm:text-base font-normal leading-relaxed sm:leading-loose font-passage select-text whitespace-pre-line">
+                  {parsed.passage}
+                </p>
+              </div>
+              <h2 className="text-base sm:text-lg md:text-xl font-bold text-slate-800 leading-snug pt-1">
+                {parsed.question}
+              </h2>
+            </div>
+          );
+        }
+        return (
+          <h2 className="text-base sm:text-lg md:text-xl font-bold text-slate-800 leading-relaxed mb-6">
+            {questionText}
+          </h2>
+        );
+      })()}
 
       {/* 4 Choices (ก, ข, ค, ง) */}
       <div className="space-y-3">

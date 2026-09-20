@@ -39,6 +39,76 @@ interface DetailedResult {
   category: string;
 }
 
+function parseQuestionContent(text: string) {
+  if (!text) return { instruction: null, passage: null, question: "" };
+
+  const cleanText = text.trim();
+
+  // Pattern 1: Starts with instruction like "อ่านบทความต่อไปนี้แล้วตอบคำถาม:"
+  const instructionRegex =
+    /^(อ่าน(?:บทความ|ข้อความ|เนื้อหา)?(?:ต่อไปนี้)?(?:แล้วตอบคำถาม)?[:\s]*|จงอ่าน(?:บทความ|ข้อความ)?(?:ต่อไปนี้)?[:\s]*|Read the following(?: passage)?[^\n]*:?)\s*\n+/i;
+
+  let instruction: string | null = null;
+  let remaining = cleanText;
+
+  const instrMatch = cleanText.match(instructionRegex);
+  if (instrMatch) {
+    instruction = instrMatch[1].trim();
+    remaining = cleanText.slice(instrMatch[0].length).trim();
+  }
+
+  // Check if remaining has a quoted passage: "..." or “...”
+  const quoteMatch = remaining.match(/^["“]([\s\S]+?)["”]\s*([\s\S]*)$/);
+  if (quoteMatch) {
+    const passage = quoteMatch[1].trim();
+    const question = quoteMatch[2].trim();
+    if (instruction || passage.length >= 40) {
+      return {
+        instruction: instruction || "อ่านบทความต่อไปนี้แล้วตอบคำถาม:",
+        passage: `"${passage}"`,
+        question: question || (instruction ? "" : cleanText),
+      };
+    }
+  }
+
+  // Check if there are multiple paragraphs separated by \n\n where last line is the question
+  const parts = remaining.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const lastPart = parts[parts.length - 1];
+    if (
+      lastPart.includes("?") ||
+      lastPart.includes("ข้อใด") ||
+      lastPart.includes("คืออะไร") ||
+      lastPart.includes("เพราะเหตุใด") ||
+      lastPart.includes("หมายถึง") ||
+      lastPart.includes("ถูกต้อง") ||
+      lastPart.length < 150
+    ) {
+      const passageParts = parts.slice(0, parts.length - 1).join("\n\n");
+      if (instruction || passageParts.length >= 40) {
+        return {
+          instruction:
+            instruction ||
+            (passageParts.length > 60
+              ? "อ่านข้อความต่อไปนี้แล้วตอบคำถาม:"
+              : null),
+          passage:
+            passageParts.startsWith('"') || passageParts.startsWith("“")
+              ? passageParts
+              : `"${passageParts}"`,
+          question: lastPart,
+        };
+      }
+    }
+  }
+
+  return {
+    instruction: null,
+    passage: null,
+    question: cleanText,
+  };
+}
+
 function ExamSessionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -306,9 +376,33 @@ function ExamSessionContent() {
                     </span>
                   </div>
 
-                  <h4 className="text-sm sm:text-base font-bold text-slate-900 leading-relaxed mb-4">
-                    {item.questionText}
-                  </h4>
+                  {(() => {
+                    const parsed = parseQuestionContent(item.questionText);
+                    if (parsed.passage) {
+                      return (
+                        <div className="space-y-3 mb-4">
+                          {parsed.instruction && (
+                            <p className="text-xs sm:text-sm font-bold text-slate-700 leading-snug">
+                              {parsed.instruction}
+                            </p>
+                          )}
+                          <div className="rounded-2xl bg-[#F8FAFD] border border-blue-100/90 border-l-[5px] border-l-[#2563EB] p-4 sm:p-5 shadow-2xs">
+                            <p className="text-slate-800 text-sm sm:text-base font-normal leading-relaxed sm:leading-loose font-passage select-text whitespace-pre-line">
+                              {parsed.passage}
+                            </p>
+                          </div>
+                          <h4 className="text-sm sm:text-base font-black text-slate-900 leading-snug pt-1">
+                            {parsed.question}
+                          </h4>
+                        </div>
+                      );
+                    }
+                    return (
+                      <h4 className="text-sm sm:text-base font-bold text-slate-900 leading-relaxed mb-4">
+                        {item.questionText}
+                      </h4>
+                    );
+                  })()}
 
                   {/* Choices with Correct & User Answer Indicators */}
                   <div className="space-y-2 mb-4">
@@ -421,10 +515,34 @@ function ExamSessionContent() {
             </button>
           </div>
 
-          {/* Question Title */}
-          <h2 className="text-base sm:text-lg font-black text-slate-900 leading-relaxed">
-            {currentQ.questionText}
-          </h2>
+          {/* Question Title & Reading Passage Box */}
+          {(() => {
+            const parsed = parseQuestionContent(currentQ.questionText);
+            if (parsed.passage) {
+              return (
+                <div className="space-y-3">
+                  {parsed.instruction && (
+                    <p className="text-xs sm:text-sm font-bold text-slate-700 leading-snug">
+                      {parsed.instruction}
+                    </p>
+                  )}
+                  <div className="rounded-2xl bg-[#F8FAFD] border border-blue-100/90 border-l-[5px] border-l-[#2563EB] p-4 sm:p-5 shadow-2xs">
+                    <p className="text-slate-800 text-sm sm:text-base font-normal leading-relaxed sm:leading-loose font-passage select-text whitespace-pre-line">
+                      {parsed.passage}
+                    </p>
+                  </div>
+                  <h2 className="text-base sm:text-lg font-black text-slate-900 leading-snug pt-1">
+                    {parsed.question}
+                  </h2>
+                </div>
+              );
+            }
+            return (
+              <h2 className="text-base sm:text-lg font-black text-slate-900 leading-relaxed">
+                {currentQ.questionText}
+              </h2>
+            );
+          })()}
 
           {/* 4 Choices */}
           <div className="space-y-3 pt-1">
