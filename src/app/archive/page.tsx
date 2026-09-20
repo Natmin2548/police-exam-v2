@@ -19,6 +19,7 @@ import {
   Layers,
   ArrowRight,
 } from "lucide-react";
+import { MobileBottomNav } from "@/components/navigation/MobileBottomNav";
 
 interface ChapterItem {
   num: string;
@@ -486,6 +487,7 @@ function ArchiveContent() {
           </div>
         )}
       </main>
+      <MobileBottomNav />
     </div>
   );
 }

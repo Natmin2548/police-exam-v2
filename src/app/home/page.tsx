@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
-import { LeaderboardTab } from "@/components/home/LeaderboardTab";
+import { MobileBottomNav } from "@/components/navigation/MobileBottomNav";
 
 interface Recommendation {
   badge: string;
@@ -320,34 +320,24 @@ export default function HomePage() {
 
           {/* Desktop Navigation Links (Center) */}
           <nav className="hidden lg:flex items-center gap-1.5 bg-slate-100/90 p-1.5 rounded-2xl border border-slate-200/50">
-            <button
-              type="button"
-              onClick={() => setActiveTab("home")}
-              className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "home"
-                  ? "bg-white text-[#BD1B0B] shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
+            <Link
+              href="/home"
+              className="px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer bg-white text-[#BD1B0B] shadow-xs"
             >
               หน้าหลัก
-            </button>
+            </Link>
             <Link
               href="/archive"
               className="px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-slate-600 hover:text-slate-900"
             >
               คลังข้อสอบ
             </Link>
-            <button
-              type="button"
-              onClick={() => setActiveTab("rank")}
-              className={`px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                activeTab === "rank"
-                  ? "bg-white text-[#BD1B0B] shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
+            <Link
+              href="/rank"
+              className="px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-slate-600 hover:text-slate-900"
             >
               จัดอันดับ
-            </button>
+            </Link>
           </nav>
 
           {/* User Info & Actions */}
@@ -469,15 +459,8 @@ export default function HomePage() {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-4 sm:pt-6">
-        {activeTab === "rank" ? (
-          <LeaderboardTab
-            userEmail={user?.email}
-            displayName={displayName}
-            avatarUrl={avatarUrl}
-          />
-        ) : (
-          /* Responsive Grid: Single column on Mobile, 2-Column Dashboard on Desktop */
-          <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start space-y-6 lg:space-y-0">
+        {/* Responsive Grid: Single column on Mobile, 2-Column Dashboard on Desktop */}
+        <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start space-y-6 lg:space-y-0">
           
           {/* Left Column (8 Columns on PC) */}
           <div className="lg:col-span-8 space-y-6">
@@ -523,15 +506,15 @@ export default function HomePage() {
               </Link>
 
               {/* Card 3: อันดับ */}
-              <div
-                onClick={() => setActiveTab("rank")}
-                className="bg-white border border-slate-100 hover:border-red-200 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer"
+              <Link
+                href="/rank"
+                className="bg-white border border-slate-100 hover:border-red-200 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer block"
               >
                 <h3 className="text-base font-black text-[#BD1B0B] mb-0.5">
                   อันดับ
                 </h3>
                 <p className="text-xs text-slate-400 font-medium">ผู้สอบ 150 ข้อ</p>
-              </div>
+              </Link>
 
               {/* Card 4: คลังคำศัพท์ */}
               <div className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer">
@@ -824,44 +807,10 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-      )}
       </main>
 
-      {/* Floating Bottom Navigation Dock (Visible on Mobile only, hidden on PC) */}
-      <nav className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-full px-6 py-2 shadow-xl shadow-slate-900/10 flex items-center gap-8 sm:gap-12 lg:hidden">
-        {/* Nav Item 1: หน้าหลัก (Active) */}
-        <button
-          type="button"
-          onClick={() => setActiveTab("home")}
-          className={`flex flex-col items-center gap-0.5 transition-colors cursor-pointer ${
-            activeTab === "home" ? "text-[#BD1B0B]" : "text-slate-400 hover:text-slate-600"
-          }`}
-        >
-          <Home className="w-5 h-5" />
-          <span className="text-[10px] font-bold">หน้าหลัก</span>
-        </button>
-
-        {/* Nav Item 2: คลัง */}
-        <Link
-          href="/archive"
-          className="flex flex-col items-center gap-0.5 transition-colors cursor-pointer text-slate-400 hover:text-slate-600"
-        >
-          <BookMarked className="w-5 h-5" />
-          <span className="text-[10px] font-bold">คลัง</span>
-        </Link>
-
-        {/* Nav Item 3: อันดับ */}
-        <button
-          type="button"
-          onClick={() => setActiveTab("rank")}
-          className={`flex flex-col items-center gap-0.5 transition-colors cursor-pointer ${
-            activeTab === "rank" ? "text-[#BD1B0B]" : "text-slate-400 hover:text-slate-600"
-          }`}
-        >
-          <Trophy className="w-5 h-5" />
-          <span className="text-[10px] font-bold">อันดับ</span>
-        </button>
-      </nav>
+      {/* Mobile Full-Width Bottom Nav */}
+      <MobileBottomNav />
     </div>
   );
 }
