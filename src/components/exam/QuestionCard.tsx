@@ -23,58 +23,77 @@ function parseQuestionContent(text: string) {
 
   const cleanText = text.trim();
 
-  const instructionRegex =
-    /^(อ่าน(?:บทความ|ข้อความ|เนื้อหา)?(?:ต่อไปนี้)?(?:แล้วตอบคำถาม)?[:\s]*|จงอ่าน(?:บทความ|ข้อความ)?(?:ต่อไปนี้)?[:\s]*|Read the following(?: passage)?[^\n]*:?)\s*/i;
+  // 1. Extract Quoted Passage anywhere in the text: "..." or “...”
+  const quoteRegex = /([\s\S]*?)["“]([\s\S]+?)["”]([\s\S]*)/;
+  const quoteMatch = cleanText.match(quoteRegex);
 
-  let instruction: string | null = null;
-  let remaining = cleanText;
-
-  const instrMatch = cleanText.match(instructionRegex);
-  if (instrMatch && instrMatch[1].trim().length > 3) {
-    instruction = instrMatch[1].trim();
-    remaining = cleanText.slice(instrMatch[0].length).trim();
-  }
-
-  const quoteMatch = remaining.match(/^["“]([\s\S]+?)["”]\s*([\s\S]*)$/);
   if (quoteMatch) {
-    const passage = quoteMatch[1].trim();
-    const question = quoteMatch[2].trim();
-    if (instruction || passage.length >= 40) {
+    const prefix = quoteMatch[1].trim();
+    const passage = quoteMatch[2].trim();
+    const suffix = quoteMatch[3].trim();
+
+    if (
+      passage.length >= 15 ||
+      prefix.includes("พิจารณา") ||
+      prefix.includes("ข้อความ") ||
+      prefix.includes("บทความ") ||
+      prefix.includes("อ่าน")
+    ) {
+      let instruction = prefix || null;
+      let question = suffix || "";
+
+      if (!instruction && (passage.length > 50 || suffix)) {
+        instruction = "อ่านข้อความต่อไปนี้แล้วตอบคำถาม:";
+      }
+
       return {
-        instruction: instruction || "อ่านบทความต่อไปนี้แล้วตอบคำถาม:",
+        instruction,
         passage: `"${passage}"`,
         question: question || (instruction ? "" : cleanText),
       };
     }
   }
 
-  const parts = remaining.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-  if (parts.length >= 2) {
-    const lastPart = parts[parts.length - 1];
-    if (
-      lastPart.includes("?") ||
-      lastPart.includes("ข้อใด") ||
-      lastPart.includes("คืออะไร") ||
-      lastPart.includes("เพราะเหตุใด") ||
-      lastPart.includes("หมายถึง") ||
-      lastPart.includes("ถูกต้อง") ||
-      lastPart.length < 150
-    ) {
-      const passageParts = parts.slice(0, parts.length - 1).join("\n\n");
-      if (instruction || passageParts.length >= 40) {
-        return {
-          instruction:
-            instruction ||
-            (passageParts.length > 60
-              ? "อ่านข้อความต่อไปนี้แล้วตอบคำถาม:"
-              : null),
-          passage:
-            passageParts.startsWith('"') || passageParts.startsWith("“")
-              ? passageParts
-              : `"${passageParts}"`,
-          question: lastPart,
-        };
-      }
+  // 2. Multiline paragraphs without quotes (separated by \n or \n\n)
+  const lines = cleanText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  if (lines.length >= 3) {
+    const isFirstLineInstruction = /^(อ่าน|จงอ่าน|พิจารณา|จากข้อความ|Read)/i.test(lines[0]);
+    const lastLine = lines[lines.length - 1];
+    const isLastLineQuestion =
+      lastLine.includes("?") ||
+      lastLine.includes("ข้อใด") ||
+      lastLine.includes("คืออะไร") ||
+      lastLine.includes("เพราะเหตุใด") ||
+      lastLine.includes("หมายถึง") ||
+      lastLine.includes("ถูกต้อง") ||
+      lastLine.length < 150;
+
+    if (isFirstLineInstruction && isLastLineQuestion) {
+      const instruction = lines[0];
+      const passageLines = lines.slice(1, lines.length - 1).join("\n");
+      return {
+        instruction,
+        passage: passageLines.startsWith('"') ? passageLines : `"${passageLines}"`,
+        question: lastLine,
+      };
+    }
+  }
+
+  if (lines.length === 2) {
+    const isFirstLineInstruction = /^(อ่าน|จงอ่าน|พิจารณา|จากข้อความ|Read)/i.test(lines[0]);
+    if (isFirstLineInstruction) {
+      return {
+        instruction: lines[0],
+        passage: null,
+        question: lines[1],
+      };
+    }
+    if (lines[0].length > 40 && (lines[1].includes("?") || lines[1].includes("ข้อใด"))) {
+      return {
+        instruction: "อ่านข้อความต่อไปนี้แล้วตอบคำถาม:",
+        passage: `"${lines[0]}"`,
+        question: lines[1],
+      };
     }
   }
 
