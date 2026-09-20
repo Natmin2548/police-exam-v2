@@ -13,6 +13,10 @@ import {
   FileText,
   ClipboardList,
   BookOpen,
+  Shield,
+  Search,
+  BookCheck,
+  Layers,
 } from "lucide-react";
 
 interface ChapterItem {
@@ -41,6 +45,8 @@ function ArchiveContent() {
 
   const [categories, setCategories] = useState<CategoryData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [chapterSearchQuery, setChapterSearchQuery] = useState("");
 
   useEffect(() => {
     const fetchChapters = async () => {
@@ -63,16 +69,35 @@ function ArchiveContent() {
   }, []);
 
   const activeCategory = categories.find(
-    (c) => c.categoryKey === selectedCategoryKey || c.displayName === selectedCategoryKey
+    (c) =>
+      c.categoryKey === selectedCategoryKey ||
+      c.displayName === selectedCategoryKey
+  );
+
+  const totalChaptersCount = categories.reduce(
+    (acc, c) => acc + c.chapterCount,
+    0
+  );
+  const totalQuestionsSum = categories.reduce(
+    (acc, c) => acc + c.totalQuestions,
+    0
   );
 
   // Helper to render subject icon
   const renderIcon = (type: string, color: string) => {
     switch (type) {
       case "text":
-        return <span className={`text-xs font-black ${color} tracking-wider`}>TH</span>;
+        return (
+          <span className={`text-xs font-black ${color} tracking-wider`}>
+            TH
+          </span>
+        );
       case "text_en":
-        return <span className={`text-xs font-black ${color} tracking-wider`}>EN</span>;
+        return (
+          <span className={`text-xs font-black ${color} tracking-wider`}>
+            EN
+          </span>
+        );
       case "brain":
         return <Brain className={`w-5 h-5 ${color}`} />;
       case "laptop":
@@ -118,133 +143,312 @@ function ArchiveContent() {
     return (
       <div className="min-h-screen bg-[#FBFBFB] flex flex-col items-center justify-center p-4">
         <div className="w-10 h-10 rounded-full border-3 border-red-200 border-t-[#BD1B0B] animate-spin mb-4" />
-        <p className="text-sm font-black text-slate-800">กำลังโหลดคลังข้อสอบรายบท...</p>
+        <p className="text-sm font-black text-slate-800">
+          กำลังโหลดคลังข้อสอบรายบท...
+        </p>
       </div>
     );
   }
 
-  // SCREEN 4: CHAPTERS LIST FOR SELECTED SUBJECT
-  if (activeCategory) {
-    return (
-      <div className="min-h-screen bg-[#FBFBFB] py-6 sm:py-10 px-4">
-        <div className="max-w-xl mx-auto space-y-6">
-          {/* Header with back button */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/archive")}
-              className="inline-flex items-center gap-2 text-slate-800 hover:text-[#BD1B0B] transition-colors cursor-pointer group"
-            >
-              <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                {activeCategory.displayName}
-              </h1>
-            </button>
-          </div>
+  // Filtered lists
+  const filteredCategories = categories.filter((cat) =>
+    cat.displayName.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  );
 
-          {/* White Card with list of chapters */}
-          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs divide-y divide-slate-100 overflow-hidden">
-            {activeCategory.chapters.map((ch, idx) => (
-              <Link
-                key={idx}
-                href={`/exam/session?mode=chapter&setIds=${ch.setIds.join(
-                  ","
-                )}&title=${encodeURIComponent(ch.name)}&category=${encodeURIComponent(
-                  activeCategory.categoryKey
-                )}`}
-                className="flex items-center justify-between p-4 sm:p-5 hover:bg-slate-50/80 transition-colors group cursor-pointer"
-              >
-                {/* Left: Red number */}
-                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                  <span className="w-7 sm:w-8 text-base sm:text-lg font-black text-[#BD1B0B] shrink-0">
-                    {idx + 1}
-                  </span>
+  const filteredChapters = activeCategory
+    ? activeCategory.chapters.filter((ch) =>
+        ch.name.toLowerCase().includes(chapterSearchQuery.trim().toLowerCase())
+      )
+    : [];
 
-                  {/* Middle: Title & Count */}
-                  <div className="min-w-0 truncate">
-                    <h2 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-[#BD1B0B] transition-colors truncate">
-                      {ch.name}
-                    </h2>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">
-                      {ch.totalQuestions} ข้อ
-                    </p>
-                  </div>
-                </div>
-
-                {/* Right: Chevron */}
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // SCREEN 3: SUBJECTS SELECTION FOR CHAPTER EXAMS
   return (
-    <div className="min-h-screen bg-[#FBFBFB] py-6 sm:py-10 px-4 pb-20">
-      <div className="max-w-xl mx-auto space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mb-1">
-            คลังข้อสอบรายบท
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 font-bold">เลือกวิชา</p>
-        </div>
+    <div className="min-h-screen bg-[#FBFBFB] text-slate-900 flex flex-col">
+      {/* Top Navigation Bar (Consistent with Site Theme & Desktop Optimized) */}
+      <header className="sticky top-0 z-30 bg-[#FBFBFB]/95 backdrop-blur-md border-b border-slate-100 px-4 sm:px-8 py-3.5">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+          {/* Brand Logo */}
+          <Link href="/home" className="flex items-center gap-2 group shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-[#BD1B0B] flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+              <Shield className="w-4 h-4 fill-white" />
+            </div>
+            <span className="font-black text-base sm:text-lg tracking-tight text-slate-900">
+              POLICE<span className="text-[#BD1B0B]">EXAM</span>
+            </span>
+          </Link>
 
-        {/* Subjects List */}
-        <div className="space-y-3 pt-1">
-          {categories.map((cat) => (
+          {/* Desktop Breadcrumbs */}
+          <div className="hidden md:flex items-center gap-2 text-xs font-bold text-slate-500">
             <Link
-              key={cat.categoryKey}
-              href={`/archive?subject=${encodeURIComponent(cat.categoryKey)}`}
-              className="block bg-white border border-slate-200/80 hover:border-red-200 rounded-3xl p-4 sm:p-5 shadow-xs hover:shadow-lg hover:-translate-y-0.5 transition-all group cursor-pointer"
+              href="/home"
+              className="hover:text-[#BD1B0B] transition-colors"
             >
-              <div className="flex items-center justify-between gap-4">
-                {/* Left: Icon & Title */}
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div
-                    className={`w-12 h-12 rounded-2xl ${getIconBg(
-                      cat.iconType
-                    )} flex items-center justify-center shrink-0 border border-slate-100 shadow-2xs`}
-                  >
-                    {renderIcon(cat.iconType, cat.iconColor)}
-                  </div>
-
-                  <div className="truncate">
-                    <h2 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-[#BD1B0B] transition-colors truncate">
-                      {cat.displayName}
-                    </h2>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5">
-                      {cat.totalQuestions} ข้อในคลัง
-                    </p>
-                  </div>
-                </div>
-
-                {/* Right: Pastel Badge Pill */}
-                <div
-                  className={`px-3 py-1 rounded-full text-xs font-black ${cat.badgeBg} ${cat.badgeText} flex items-center gap-1 shrink-0 border border-slate-100`}
-                >
-                  <span>{cat.chapterCount} บท</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </div>
-              </div>
+              หน้าหลัก
             </Link>
-          ))}
-        </div>
+            <ChevronRight className="w-3 h-3 text-slate-300" />
+            <Link
+              href="/archive"
+              className={`transition-colors ${
+                activeCategory
+                  ? "hover:text-[#BD1B0B]"
+                  : "text-slate-900 font-black"
+              }`}
+            >
+              คลังข้อสอบรายบท
+            </Link>
+            {activeCategory && (
+              <>
+                <ChevronRight className="w-3 h-3 text-slate-300" />
+                <span className="text-[#BD1B0B] font-black">
+                  {activeCategory.displayName}
+                </span>
+              </>
+            )}
+          </div>
 
-        {/* Bottom Button: กลับหน้าหลัก */}
-        <div className="pt-4">
+          {/* Action Button: กลับหน้าหลัก */}
           <Link
             href="/home"
-            className="w-full py-3.5 px-4 bg-white border border-[#BD1B0B] text-[#BD1B0B] hover:bg-red-50 text-sm font-black rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 hover:border-red-200 hover:text-[#BD1B0B] text-slate-700 transition-all shadow-2xs"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-3.5 h-3.5" />
             <span>กลับหน้าหลัก</span>
           </Link>
         </div>
-      </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
+        {/* SCREEN 4: CHAPTERS LIST FOR SELECTED SUBJECT */}
+        {activeCategory ? (
+          <div className="space-y-6">
+            {/* Subject Hero Banner */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-7 shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/archive")}
+                    className="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                    title="กลับไปเลือกวิชา"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
+
+                  <div
+                    className={`w-12 h-12 rounded-2xl ${getIconBg(
+                      activeCategory.iconType
+                    )} flex items-center justify-center shrink-0 border border-slate-100`}
+                  >
+                    {renderIcon(
+                      activeCategory.iconType,
+                      activeCategory.iconColor
+                    )}
+                  </div>
+
+                  <div>
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
+                      {activeCategory.displayName}
+                    </h1>
+                    <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                      เลือกบทเรียนที่ต้องการฝึก เพื่อทำแบบทดสอบแบบเจาะลึก
+                    </p>
+                  </div>
+                </div>
+
+                {/* Subject Summary Pills */}
+                <div className="flex items-center gap-2.5 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                  <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{activeCategory.chapterCount} บทเรียน</span>
+                  </span>
+                  <span className="px-3 py-1.5 rounded-xl bg-red-50 text-[#BD1B0B] border border-red-100 text-xs font-bold flex items-center gap-1.5">
+                    <BookCheck className="w-3.5 h-3.5 text-[#BD1B0B]" />
+                    <span>{activeCategory.totalQuestions} ข้อในคลัง</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Search Chapters Filter */}
+              {activeCategory.chapters.length > 6 && (
+                <div className="mt-5 pt-5 border-t border-slate-100">
+                  <div className="relative max-w-md">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="ค้นหาชื่อบทเรียน..."
+                      value={chapterSearchQuery}
+                      onChange={(e) => setChapterSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs sm:text-sm focus:outline-none focus:border-red-400 focus:bg-white focus:ring-2 focus:ring-red-100 transition-all placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Chapters Grid / Cards (1 col on mobile, 2 cols on tablet/desktop) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+              {filteredChapters.map((ch, idx) => (
+                <Link
+                  key={idx}
+                  href={`/exam/session?mode=chapter&setIds=${ch.setIds.join(
+                    ","
+                  )}&title=${encodeURIComponent(
+                    ch.name
+                  )}&category=${encodeURIComponent(
+                    activeCategory.categoryKey
+                  )}`}
+                  className="bg-white border border-slate-200/80 hover:border-red-300 rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all group cursor-pointer flex items-center justify-between gap-3.5"
+                >
+                  {/* Left: Number & Chapter Info */}
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-red-50 text-[#BD1B0B] group-hover:bg-[#BD1B0B] group-hover:text-white flex items-center justify-center font-black text-xs sm:text-sm shrink-0 transition-colors">
+                      {idx + 1}
+                    </div>
+
+                    <div className="min-w-0 truncate">
+                      <h2 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-[#BD1B0B] transition-colors truncate">
+                        {ch.name}
+                      </h2>
+                      <p className="text-[11px] sm:text-xs text-slate-400 font-medium mt-0.5">
+                        {ch.totalQuestions} ข้อ
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right: Action Pill & Arrow */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="hidden sm:inline-block text-[11px] font-bold text-slate-400 group-hover:text-[#BD1B0B] transition-colors">
+                      เริ่มทำ
+                    </span>
+                    <div className="w-7 h-7 rounded-lg bg-slate-50 group-hover:bg-red-50 flex items-center justify-center transition-colors">
+                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-[#BD1B0B] group-hover:translate-x-0.5 transition-all" />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+              <button
+                type="button"
+                onClick={() => router.push("/archive")}
+                className="w-full sm:w-auto py-3 px-5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-bold rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>กลับไปเลือกวิชาอื่น</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* SCREEN 3: SUBJECTS SELECTION FOR CHAPTER EXAMS */
+          <div className="space-y-6">
+            {/* Header & Stats Banner */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-slate-200/60">
+              <div>
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight mb-1">
+                  คลังข้อสอบรายบท
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 font-bold">
+                  เลือกวิชาที่ต้องการฝึกฝน
+                </p>
+              </div>
+
+              {/* Stat Summary Badges for Desktop */}
+              <div className="hidden sm:flex items-center gap-3 shrink-0">
+                <div className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-center min-w-[100px]">
+                  <span className="block text-[11px] text-slate-400 font-bold">
+                    หมวดวิชา
+                  </span>
+                  <span className="text-sm sm:text-base font-black text-slate-900">
+                    {categories.length} วิชา
+                  </span>
+                </div>
+                <div className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-center min-w-[100px]">
+                  <span className="block text-[11px] text-slate-400 font-bold">
+                    บทเรียนทั้งหมด
+                  </span>
+                  <span className="text-sm sm:text-base font-black text-[#BD1B0B]">
+                    {totalChaptersCount} บท
+                  </span>
+                </div>
+                <div className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs text-center min-w-[100px]">
+                  <span className="block text-[11px] text-slate-400 font-bold">
+                    จำนวนข้อรวม
+                  </span>
+                  <span className="text-sm sm:text-base font-black text-slate-900">
+                    {totalQuestionsSum.toLocaleString()} ข้อ
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Search Bar for Desktop/Tablet */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="ค้นหาวิชา..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-white border border-slate-200/80 rounded-2xl text-xs sm:text-sm focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 transition-all placeholder:text-slate-400 shadow-2xs"
+              />
+            </div>
+
+            {/* Subjects Grid: 1 col on mobile (exact matching screenshot), 2 cols on tablet/desktop */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 lg:gap-5 pt-1">
+              {filteredCategories.map((cat) => (
+                <Link
+                  key={cat.categoryKey}
+                  href={`/archive?subject=${encodeURIComponent(
+                    cat.categoryKey
+                  )}`}
+                  className="bg-white border border-slate-200/80 hover:border-red-300 rounded-3xl p-4 sm:p-5 shadow-2xs hover:shadow-md hover:-translate-y-0.5 transition-all group cursor-pointer flex items-center justify-between gap-4"
+                >
+                  {/* Left: Icon & Title */}
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    <div
+                      className={`w-12 h-12 rounded-2xl ${getIconBg(
+                        cat.iconType
+                      )} flex items-center justify-center shrink-0 border border-slate-100 shadow-2xs`}
+                    >
+                      {renderIcon(cat.iconType, cat.iconColor)}
+                    </div>
+
+                    <div className="truncate">
+                      <h2 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-[#BD1B0B] transition-colors truncate">
+                        {cat.displayName}
+                      </h2>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5">
+                        {cat.totalQuestions} ข้อในคลัง
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right: Pastel Badge Pill */}
+                  <div
+                    className={`px-3 py-1 rounded-full text-xs font-black ${cat.badgeBg} ${cat.badgeText} flex items-center gap-1 shrink-0 border border-slate-100 group-hover:scale-105 transition-transform`}
+                  >
+                    <span>{cat.chapterCount} บท</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Bottom Button: กลับหน้าหลัก */}
+            <div className="pt-4 max-w-sm mx-auto">
+              <Link
+                href="/home"
+                className="w-full py-3.5 px-4 bg-white border border-[#BD1B0B] text-[#BD1B0B] hover:bg-red-50 text-sm font-black rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>กลับหน้าหลัก</span>
+              </Link>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
@@ -255,7 +459,9 @@ export default function ArchivePage() {
       fallback={
         <div className="min-h-screen bg-[#FBFBFB] flex flex-col items-center justify-center p-4">
           <div className="w-10 h-10 rounded-full border-3 border-red-200 border-t-[#BD1B0B] animate-spin mb-4" />
-          <p className="text-sm font-black text-slate-800">กำลังเตรียมคลังข้อสอบ...</p>
+          <p className="text-sm font-black text-slate-800">
+            กำลังเตรียมคลังข้อสอบ...
+          </p>
         </div>
       }
     >
