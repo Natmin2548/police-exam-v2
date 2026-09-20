@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
+import { LeaderboardTab } from "@/components/home/LeaderboardTab";
 
 interface Recommendation {
   badge: string;
@@ -468,8 +469,15 @@ export default function HomePage() {
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 pt-4 sm:pt-6">
-        {/* Responsive Grid: Single column on Mobile, 2-Column Dashboard on Desktop */}
-        <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start space-y-6 lg:space-y-0">
+        {activeTab === "rank" ? (
+          <LeaderboardTab
+            userEmail={user?.email}
+            displayName={displayName}
+            avatarUrl={avatarUrl}
+          />
+        ) : (
+          /* Responsive Grid: Single column on Mobile, 2-Column Dashboard on Desktop */
+          <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start space-y-6 lg:space-y-0">
           
           {/* Left Column (8 Columns on PC) */}
           <div className="lg:col-span-8 space-y-6">
@@ -795,6 +803,7 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      )}
       </main>
 
       {/* Floating Bottom Navigation Dock (Visible on Mobile only, hidden on PC) */}
