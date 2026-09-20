@@ -273,7 +273,7 @@ function ExamSessionContent() {
   if (examResult) {
     return (
       <div className="min-h-screen bg-[#FBFBFB] py-8 sm:py-12 px-4">
-        <div className="max-w-xl mx-auto space-y-6">
+        <div className="max-w-3xl lg:max-w-4xl mx-auto space-y-6">
           {/* Result Card */}
           <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 text-center shadow-lg shadow-slate-900/5">
             <div className="w-16 h-16 rounded-3xl bg-red-50 text-[#BD1B0B] flex items-center justify-center mx-auto mb-4 border border-red-100">
@@ -464,7 +464,7 @@ function ExamSessionContent() {
     <div className="min-h-screen bg-[#FBFBFB] flex flex-col justify-between">
       {/* Top Bar Header */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100">
-        <div className="max-w-xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           {/* Left: Back / Exit button */}
           <button
             type="button"
@@ -475,12 +475,17 @@ function ExamSessionContent() {
             <span>ออก</span>
           </button>
 
+          {/* Center: Title on PC */}
+          <div className="hidden md:block text-xs font-bold text-slate-500 truncate max-w-md">
+            {examTitle || category}
+          </div>
+
           {/* Right: Question Number & Live Score (Screenshot 5: 1 / 30 0 ถูก) */}
-          <div className="flex items-center gap-2.5">
-            <span className="text-sm font-black text-slate-900 tracking-tight">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <span className="text-xs sm:text-sm font-black text-slate-900 tracking-tight">
               {currentIndex + 1} / {totalQuestions}
             </span>
-            <span className="text-sm font-black text-[#BD1B0B]">
+            <span className="text-xs sm:text-sm font-black text-[#BD1B0B] bg-red-50 px-2 sm:px-2.5 py-0.5 rounded-full border border-red-100">
               {correctCount} ถูก
             </span>
           </div>
@@ -496,155 +501,287 @@ function ExamSessionContent() {
       </header>
 
       {/* Main Content Area */}
-      <main className="max-w-xl mx-auto px-4 py-6 w-full flex-1 space-y-6">
-        {/* Question Card (Screenshot 5) */}
-        <div className="space-y-5">
-          {/* Badge & Report Row */}
-          <div className="flex items-center justify-between">
-            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-[#BD1B0B] border border-rose-100/60">
-              {currentQ.category || category}
-            </span>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 w-full flex-1">
+        <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start space-y-6 lg:space-y-0">
+          {/* Left Column: Question & Choices (8 Columns on PC, Full width on Mobile) */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* Question Card */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-7 shadow-xs space-y-5">
+              {/* Badge & Report Row */}
+              <div className="flex items-center justify-between">
+                <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-[#BD1B0B] border border-rose-100/60">
+                  {currentQ.category || category}
+                </span>
 
-            <button
-              type="button"
-              onClick={() => setShowReportModal(true)}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-amber-700 bg-amber-50/90 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer shadow-2xs"
-            >
-              <Flag className="w-3 h-3 text-amber-600 fill-amber-500/20" />
-              <span>แจ้งข้อผิด</span>
-            </button>
-          </div>
-
-          {/* Question Title & Reading Passage Box */}
-          {(() => {
-            const parsed = parseQuestionContent(currentQ.questionText);
-            if (parsed.passage) {
-              return (
-                <div className="space-y-3">
-                  {parsed.instruction && (
-                    <p className="text-xs sm:text-sm font-bold text-slate-700 leading-snug">
-                      {parsed.instruction}
-                    </p>
-                  )}
-                  <div className="rounded-2xl bg-[#F8FAFD] border border-blue-100/90 border-l-[5px] border-l-[#2563EB] p-4 sm:p-5 shadow-2xs">
-                    <p className="text-slate-800 text-sm sm:text-base font-normal leading-relaxed sm:leading-loose font-passage select-text whitespace-pre-line">
-                      {parsed.passage}
-                    </p>
-                  </div>
-                  <h2 className="text-base sm:text-lg font-black text-slate-900 leading-snug pt-1">
-                    {parsed.question}
-                  </h2>
-                </div>
-              );
-            }
-            return (
-              <h2 className="text-base sm:text-lg font-black text-slate-900 leading-relaxed">
-                {currentQ.questionText}
-              </h2>
-            );
-          })()}
-
-          {/* 4 Choices */}
-          <div className="space-y-3 pt-1">
-            {currentQ.choices.map((choiceText, cIdx) => {
-              const choiceNumber = cIdx + 1;
-              const isSelected = currentSelectedChoice === choiceNumber;
-
-              return (
                 <button
-                  key={cIdx}
                   type="button"
-                  onClick={() => handleSelectChoice(choiceNumber)}
-                  className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex items-center gap-3.5 group ${
-                    isSelected
-                      ? "border-2 border-[#BD1B0B] bg-red-50/30 shadow-xs"
-                      : "bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/50"
+                  onClick={() => setShowReportModal(true)}
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-amber-700 bg-amber-50/90 border border-amber-200/80 hover:bg-amber-100 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <Flag className="w-3 h-3 text-amber-600 fill-amber-500/20" />
+                  <span>แจ้งข้อผิด</span>
+                </button>
+              </div>
+
+              {/* Question Title & Reading Passage Box */}
+              {(() => {
+                const parsed = parseQuestionContent(currentQ.questionText);
+                if (parsed.passage) {
+                  return (
+                    <div className="space-y-3.5">
+                      {parsed.instruction && (
+                        <p className="text-xs sm:text-sm font-bold text-slate-700 leading-snug">
+                          {parsed.instruction}
+                        </p>
+                      )}
+                      <div className="rounded-2xl bg-[#F8FAFD] border border-blue-100/90 border-l-[5px] border-l-[#2563EB] p-4 sm:p-6 shadow-2xs">
+                        <p className="text-slate-800 text-sm sm:text-base font-normal leading-relaxed sm:leading-loose font-passage select-text whitespace-pre-line">
+                          {parsed.passage}
+                        </p>
+                      </div>
+                      <h2 className="text-base sm:text-lg lg:text-xl font-black text-slate-900 leading-snug pt-1">
+                        {parsed.question}
+                      </h2>
+                    </div>
+                  );
+                }
+                return (
+                  <h2 className="text-base sm:text-lg lg:text-xl font-black text-slate-900 leading-relaxed">
+                    {currentQ.questionText}
+                  </h2>
+                );
+              })()}
+
+              {/* 4 Choices */}
+              <div className="space-y-3 pt-2">
+                {currentQ.choices.map((choiceText, cIdx) => {
+                  const choiceNumber = cIdx + 1;
+                  const isSelected = currentSelectedChoice === choiceNumber;
+
+                  return (
+                    <button
+                      key={cIdx}
+                      type="button"
+                      onClick={() => handleSelectChoice(choiceNumber)}
+                      className={`w-full text-left p-4 rounded-2xl border transition-all cursor-pointer flex items-center gap-3.5 group ${
+                        isSelected
+                          ? "border-2 border-[#BD1B0B] bg-red-50/30 shadow-xs"
+                          : "bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/50"
+                      }`}
+                    >
+                      {/* Choice Letter Pill (ก, ข, ค, ง) */}
+                      <div
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 transition-colors ${
+                          isSelected
+                            ? "bg-[#BD1B0B] text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
+                        }`}
+                      >
+                        {choiceLetters[cIdx]}
+                      </div>
+
+                      {/* Choice Text */}
+                      <span
+                        className={`text-xs sm:text-sm font-medium leading-relaxed flex-1 ${
+                          isSelected
+                            ? "text-slate-900 font-bold"
+                            : "text-slate-800"
+                        }`}
+                      >
+                        {choiceText}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Action Buttons: Previous & Next */}
+              <div className="pt-3 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentIndex((prev) => Math.max(0, prev - 1))
+                  }
+                  disabled={currentIndex === 0}
+                  className={`py-3.5 px-4 sm:px-5 rounded-2xl border text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    currentIndex === 0
+                      ? "border-slate-200 text-slate-300 cursor-not-allowed bg-slate-50"
+                      : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs"
                   }`}
                 >
-                  {/* Choice Letter Pill (ก, ข, ค, ง) */}
-                  <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 transition-colors ${
-                      isSelected
-                        ? "bg-[#BD1B0B] text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
-                    }`}
-                  >
-                    {choiceLetters[cIdx]}
-                  </div>
-
-                  {/* Choice Text */}
-                  <span
-                    className={`text-xs sm:text-sm font-medium leading-relaxed flex-1 ${
-                      isSelected ? "text-slate-900 font-bold" : "text-slate-800"
-                    }`}
-                  >
-                    {choiceText}
-                  </span>
+                  <ArrowLeft className="w-4 h-4" />
+                  <span className="hidden sm:inline">ข้อก่อนหน้า</span>
                 </button>
-              );
-            })}
+
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3.5 sm:py-4 px-6 bg-[#BD1B0B] hover:bg-[#A81507] active:scale-[0.99] text-white text-sm font-black rounded-2xl shadow-lg shadow-red-950/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <span>กำลังตรวจข้อสอบ...</span>
+                  ) : currentIndex === totalQuestions - 1 ? (
+                    <span>ส่งคำตอบ / ดูผลลัพธ์</span>
+                  ) : (
+                    <>
+                      <span>ข้อถัดไป</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Bottom Question Grid Navigator (< lg only) */}
+            <div className="lg:hidden bg-white border border-slate-200/80 rounded-3xl p-5 shadow-xs">
+              <div className="flex items-center justify-between text-xs mb-3">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <span className="w-5 h-5 rounded-md bg-blue-500 text-white text-[10px] font-black flex items-center justify-center shadow-2xs">
+                    12
+                  </span>
+                  <span>ข้ามไปทำข้ออื่น:</span>
+                </div>
+                <span className="font-black text-[#BD1B0B]">
+                  ทำแล้ว {answeredCount}/{totalQuestions} ข้อ
+                </span>
+              </div>
+
+              {/* Grid of Number Buttons (1 to 30) */}
+              <div className="grid grid-cols-10 gap-1.5 sm:gap-2">
+                {questions.map((q, idx) => {
+                  const isCurrent = idx === currentIndex;
+                  const isAnswered = answers[q.id] !== undefined;
+
+                  let btnStyle =
+                    "bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50";
+                  if (isCurrent) {
+                    btnStyle =
+                      "border-2 border-[#BD1B0B] text-[#BD1B0B] font-black bg-white shadow-2xs";
+                  } else if (isAnswered) {
+                    btnStyle =
+                      "bg-slate-100 text-slate-900 font-bold border border-slate-300";
+                  }
+
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => setCurrentIndex(idx)}
+                      className={`h-9 rounded-xl text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${btnStyle}`}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          {/* Action Button: ข้อถัดไป -> */}
-          <div className="pt-2">
+          {/* Right Sticky Sidebar (PC Desktop Only >= lg) */}
+          <div className="hidden lg:block lg:col-span-4 sticky top-20 space-y-4">
+            {/* Overview & Progress Card */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-900">
+                  ความคืบหน้า
+                </span>
+                <span className="text-xs font-bold text-[#BD1B0B]">
+                  ทำแล้ว {answeredCount} / {totalQuestions} ข้อ
+                </span>
+              </div>
+
+              {/* Progress Bar inside Card */}
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-[#BD1B0B] h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${(answeredCount / totalQuestions) * 100}%`,
+                  }}
+                />
+              </div>
+
+              {/* 3 Status Badges */}
+              <div className="grid grid-cols-3 gap-2 pt-1 text-[11px] font-bold text-center">
+                <div className="p-2 rounded-2xl bg-red-50 text-[#BD1B0B] border border-red-100">
+                  <span className="block text-xs font-black">
+                    ข้อที่ {currentIndex + 1}
+                  </span>
+                  <span className="text-[10px] text-red-400 font-medium">
+                    ปัจจุบัน
+                  </span>
+                </div>
+                <div className="p-2 rounded-2xl bg-slate-100 text-slate-800">
+                  <span className="block text-xs font-black">
+                    {answeredCount} ข้อ
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    ตอบแล้ว
+                  </span>
+                </div>
+                <div className="p-2 rounded-2xl bg-slate-50 text-slate-500 border border-slate-100">
+                  <span className="block text-xs font-black">
+                    {totalQuestions - answeredCount} ข้อ
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    ยังไม่ตอบ
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Answer Matrix Card */}
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-900">
+                  กระดาษคำตอบ (ข้ามข้อ)
+                </span>
+                <span className="text-[11px] font-bold text-slate-400">
+                  คลิกเพื่อเลือกข้อ
+                </span>
+              </div>
+
+              {/* Grid of number buttons (5 columns on sidebar) */}
+              <div className="grid grid-cols-5 gap-2 max-h-[340px] overflow-y-auto pr-1">
+                {questions.map((q, idx) => {
+                  const isCurrent = idx === currentIndex;
+                  const isAnswered = answers[q.id] !== undefined;
+
+                  let btnClass =
+                    "bg-white border border-slate-200 text-slate-600 hover:border-slate-400";
+                  if (isCurrent) {
+                    btnClass =
+                      "border-2 border-[#BD1B0B] bg-red-50 text-[#BD1B0B] font-black shadow-xs scale-105";
+                  } else if (isAnswered) {
+                    btnClass =
+                      "bg-slate-800 text-white font-bold border-slate-800 shadow-2xs";
+                  }
+
+                  return (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => setCurrentIndex(idx)}
+                      className={`h-9 rounded-xl text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${btnClass}`}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick Submit Button in Sidebar */}
             <button
               type="button"
-              onClick={handleNext}
+              onClick={handleSubmitExam}
               disabled={isSubmitting}
-              className="w-full py-4 px-6 bg-[#BD1B0B] hover:bg-[#A81507] active:scale-[0.99] text-white text-sm font-black rounded-2xl shadow-lg shadow-red-950/20 transition-all cursor-pointer flex items-center justify-center gap-2"
+              className="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 active:scale-[0.99] text-white text-xs font-black rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
             >
-              {isSubmitting ? (
-                <span>กำลังตรวจข้อสอบ...</span>
-              ) : currentIndex === totalQuestions - 1 ? (
-                <span>ส่งคำตอบ / ดูผลลัพธ์</span>
-              ) : (
-                <>
-                  <span>ข้อถัดไป</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Bottom Question Grid Navigator (Screenshot 5) */}
-        <div className="pt-6 border-t border-slate-200/60">
-          <div className="flex items-center justify-between text-xs mb-3">
-            <div className="flex items-center gap-1.5 font-bold text-slate-800">
-              <span className="w-5 h-5 rounded-md bg-blue-500 text-white text-[10px] font-black flex items-center justify-center shadow-2xs">
-                12
+              <span>
+                {isSubmitting ? "กำลังส่งคำตอบ..." : "ส่งคำตอบและดูผลลัพธ์"}
               </span>
-              <span>ข้ามไปทำข้ออื่น:</span>
-            </div>
-            <span className="font-black text-[#BD1B0B]">
-              ทำแล้ว {answeredCount}/{totalQuestions} ข้อ
-            </span>
-          </div>
-
-          {/* Grid of Number Buttons (1 to 30) */}
-          <div className="grid grid-cols-10 gap-1.5 sm:gap-2">
-            {questions.map((q, idx) => {
-              const isCurrent = idx === currentIndex;
-              const isAnswered = answers[q.id] !== undefined;
-
-              let btnStyle = "bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50";
-              if (isCurrent) {
-                btnStyle = "border-2 border-[#BD1B0B] text-[#BD1B0B] font-black bg-white shadow-2xs";
-              } else if (isAnswered) {
-                btnStyle = "bg-slate-100 text-slate-900 font-bold border border-slate-300";
-              }
-
-              return (
-                <button
-                  key={q.id}
-                  type="button"
-                  onClick={() => setCurrentIndex(idx)}
-                  className={`h-9 rounded-xl text-xs font-bold flex items-center justify-center transition-all cursor-pointer ${btnStyle}`}
-                >
-                  {idx + 1}
-                </button>
-              );
-            })}
+            </button>
           </div>
         </div>
       </main>
