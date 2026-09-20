@@ -32,6 +32,7 @@ interface Recommendation {
 }
 
 interface UserStats {
+  userName?: string | null;
   completedSets: number;
   averageScore: number;
   maxScore: number;
@@ -263,10 +264,11 @@ export default function HomePage() {
     "";
 
   const displayName =
-    user?.email ||
-    user?.user_metadata?.email ||
     user?.user_metadata?.full_name ||
     user?.user_metadata?.name ||
+    stats.userName ||
+    user?.user_metadata?.preferred_username ||
+    (user?.email ? user.email.split("@")[0] : "") ||
     "ผู้เข้าสอบ";
 
   // Days until exam date (29 Nov 2026)

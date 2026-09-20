@@ -23,6 +23,8 @@ export async function GET(request: Request) {
       },
       select: {
         id: true,
+        fullName: true,
+        username: true,
         scoreThai: true,
         scoreGeneral: true,
         scoreComputer: true,
@@ -184,7 +186,13 @@ export async function GET(request: Request) {
       }
     }
 
+    const userName =
+      dbUser.fullName && dbUser.fullName.trim().length > 0
+        ? dbUser.fullName
+        : dbUser.username || null;
+
     return NextResponse.json({
+      userName,
       completedSets,
       averageScore,
       maxScore,
