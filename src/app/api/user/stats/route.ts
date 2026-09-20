@@ -152,7 +152,7 @@ export async function GET(request: Request) {
       title: "ฝึกทำข้อสอบสายอำนวยการ",
       description: "ตะลุยโจทย์ย้อนหลังชุดข้อสอบจริง 150 ข้อ จับเวลาจริงเพื่อฝึกสปีดความเร็ว",
       buttonText: "เริ่มทำข้อสอบทันที",
-      actionUrl: "/exam/mock",
+      actionUrl: `/exam/session?mode=pretest_admin&title=${encodeURIComponent("Pretest สายอำนวยการ 150 ข้อ")}`,
     };
 
     if (completedSets === 0 && nonZeroScores.length === 0) {
@@ -162,7 +162,7 @@ export async function GET(request: Request) {
         title: "ทดสอบวัดระดับครั้งแรก (Pretest 150 ข้อ)",
         description: "ลองทำข้อสอบเสมือนจริง 1 ชุด เพื่อให้ระบบช่วยวิเคราะห์ว่าคุณเก่งวิชาไหน และต้องเสริมวิชาไหน",
         buttonText: "เริ่มทำข้อสอบชุดแรก",
-        actionUrl: "/exam/mock",
+        actionUrl: `/exam/session?mode=pretest_suppression&title=${encodeURIComponent("Pretest สายปราบปราม 150 ข้อ")}`,
       };
     } else if (incorrectCount > 0) {
       // Priority 2: Has incorrect questions to review
@@ -171,7 +171,7 @@ export async function GET(request: Request) {
         title: `ทบทวนข้อสอบที่เคยตอบผิด ${incorrectCount} ข้อ`,
         description: "คุณมีข้อสอบที่เคยตอบผิดค้างอยู่ การแก้ข้อที่เคยผิดคือวิธีที่ช่วยดันคะแนนขึ้นได้ไวที่สุด",
         buttonText: "ฝึกแก้ข้อที่เคยผิด",
-        actionUrl: "/exam/review",
+        actionUrl: `/exam/session?mode=review_incorrect&title=${encodeURIComponent(`ฝึกแก้ข้อสอบที่เคยตอบผิด (${incorrectCount} ข้อ)`)}`,
       };
     } else {
       // Priority 3: Check for subjects with score < 60%
@@ -188,12 +188,21 @@ export async function GET(request: Request) {
       const lowest = [...subjectsList].sort((a, b) => a.score - b.score)[0];
 
       if (lowest && lowest.score < 60) {
+        const catKeyMap: Record<string, { key: string; name: string }> = {
+          thai: { key: "ภาษาไทย", name: "ภาษาไทย" },
+          math: { key: "ทั่วไป", name: "ความสามารถทั่วไป" },
+          com: { key: "คอม", name: "คอมพิวเตอร์และสารสนเทศ" },
+          law: { key: "กฏหมาย", name: "กฎหมายที่ประชาชนควรรู้" },
+          social: { key: "สังคม", name: "สังคมและวัฒนธรรม" },
+          eng: { key: "ภาษาอังกฤษ", name: "ภาษาอังกฤษ" },
+        };
+        const selected = catKeyMap[lowest.id] || { key: "ภาษาไทย", name: "ภาษาไทย" };
         recommendation = {
           badge: "เน้นแก้จุดอ่อนด่วน",
           title: `เจาะลึกวิชา${lowest.name}`,
           description: `คะแนนวิชานี้อยู่ที่ ${lowest.score}% ยังไม่ผ่านเกณฑ์ 60% แนะนำให้เน้นตะลุยโจทย์หมวดนี้เพื่อไม่ให้ตกเกณฑ์`,
           buttonText: `เริ่มฝึกวิชา${lowest.name}`,
-          actionUrl: `/exam/category/${lowest.id}`,
+          actionUrl: `/exam/session?mode=subject_single&category=${encodeURIComponent(selected.key)}&title=${encodeURIComponent(selected.name)}`,
         };
       } else {
         // Priority 4: All >= 60%
@@ -202,7 +211,7 @@ export async function GET(request: Request) {
           title: "ฝึกจับเวลาสปีด 3 ชั่วโมงเต็ม",
           description: "คะแนนของคุณอยู่ในเกณฑ์ดีแล้ว ลองฝึกจับเวลา 150 ข้อเพื่อฝึกความเร็วและไต่อันดับท็อปของประเทศ",
           buttonText: "เข้าสอบจับเวลาจริง",
-          actionUrl: "/exam/mock",
+          actionUrl: `/exam/session?mode=pretest_suppression&title=${encodeURIComponent("Pretest สายปราบปราม 150 ข้อ")}`,
         };
       }
     }

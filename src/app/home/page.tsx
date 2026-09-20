@@ -587,6 +587,27 @@ export default function HomePage() {
               </div>
             </div>
 
+            {/* Mobile Smart Recommendation Card */}
+            <div className="block lg:hidden relative overflow-hidden bg-gradient-to-br from-white via-white to-red-50/60 border-2 border-red-500/30 rounded-3xl p-5 shadow-lg shadow-red-500/5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-red-100/90 text-[#BD1B0B] border border-red-200/80 shadow-2xs mb-2.5">
+                <Flame className="w-3.5 h-3.5 text-[#BD1B0B]" />
+                <span>{activeRecommendation.badge}</span>
+              </div>
+              <h3 className="text-base font-black text-slate-900 mb-1 tracking-tight">
+                {activeRecommendation.title}
+              </h3>
+              <p className="text-xs text-slate-600 font-medium leading-relaxed mb-4">
+                {activeRecommendation.description}
+              </p>
+              <Link
+                href={activeRecommendation.actionUrl}
+                className="w-full py-3 px-4 bg-gradient-to-r from-[#BD1B0B] to-[#D32F2F] hover:from-[#A81507] hover:to-[#BD1B0B] text-white text-xs font-black rounded-2xl shadow-md shadow-red-600/20 active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2 group"
+              >
+                <span>{activeRecommendation.buttonText}</span>
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            </div>
+
             {/* Section: รายวิชา (Clean & Minimal like original) */}
             <div className="bg-white border border-slate-100 rounded-3xl p-5 sm:p-6 shadow-xs">
               <h2 className="text-base font-black text-slate-900 mb-4">รายวิชา</h2>

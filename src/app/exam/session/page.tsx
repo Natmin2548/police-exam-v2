@@ -131,7 +131,9 @@ function ExamSessionContent() {
 
   const mode = searchParams.get("mode") || "subject_single";
   const category = searchParams.get("category") || "ภาษาไทย";
-  const examTitle = searchParams.get("title") || "ทำข้อสอบ 30 ข้อ";
+  const examTitle =
+    searchParams.get("title") ||
+    (mode === "review_incorrect" ? "ฝึกแก้ข้อสอบที่เคยตอบผิด" : "ทำข้อสอบ 30 ข้อ");
 
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -176,6 +178,14 @@ function ExamSessionContent() {
       setLoading(true);
       setError("");
       try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const activeEmail = session?.user?.email || userEmail || searchParams.get("email") || "";
+        if (session?.user?.email && !userEmail) {
+          setUserEmail(session.user.email);
+        }
+
         const count = mode.startsWith("pretest") ? "150" : "30";
         const setIds = searchParams.get("setIds") || "";
         const res = await fetch(
@@ -183,7 +193,7 @@ function ExamSessionContent() {
             mode
           )}&category=${encodeURIComponent(category)}&count=${count}&setIds=${encodeURIComponent(
             setIds
-          )}`
+          )}&email=${encodeURIComponent(activeEmail)}`
         );
         if (!res.ok) {
           throw new Error("ไม่สามารถโหลดข้อสอบได้ กรุณาลองใหม่อีกครั้ง");
@@ -192,7 +202,11 @@ function ExamSessionContent() {
         if (data.questions && data.questions.length > 0) {
           setQuestions(data.questions);
         } else {
-          setError("ยังไม่มีข้อสอบในหมวดนี้");
+          setError(
+            mode === "review_incorrect"
+              ? "ยินดีด้วย! คุณไม่มีข้อสอบที่ตอบผิดค้างอยู่แล้ว"
+              : "ยังไม่มีข้อสอบในหมวดนี้"
+          );
         }
       } catch (err: any) {
         setError(err.message || "เกิดข้อผิดพลาดในการโหลดข้อสอบ");
@@ -222,12 +236,17 @@ function ExamSessionContent() {
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const currentEmail = userEmail || session?.user?.email || "";
+
       const timeSpentSeconds = Math.round((Date.now() - startTime) / 1000);
       const res = await fetch("/api/exam/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: userEmail,
+          email: currentEmail,
           subject: category,
           setTitle: examTitle,
           answers,

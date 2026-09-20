@@ -187,6 +187,80 @@ export async function GET(request: Request) {
         });
         selectedQuestions = chapterQuestions;
       }
+    } else if (mode === "review_incorrect") {
+      const email = searchParams.get("email");
+      let wrongQuestions: any[] = [];
+
+      if (email) {
+        const dbUser = await prisma.user.findFirst({
+          where: {
+            email: {
+              equals: email,
+              mode: "insensitive",
+            },
+          },
+        });
+
+        if (dbUser) {
+          const incorrectRecords = await prisma.incorrectQuestion.findMany({
+            where: {
+              userId: dbUser.id,
+              isMastered: false,
+            },
+            include: {
+              question: {
+                select: {
+                  id: true,
+                  questionText: true,
+                  choice1: true,
+                  choice2: true,
+                  choice3: true,
+                  choice4: true,
+                  correctAnswer: true,
+                  explanation: true,
+                  examSet: {
+                    select: {
+                      category: true,
+                      title: true,
+                    },
+                  },
+                },
+              },
+            },
+            orderBy: [{ wrongCount: "desc" }, { createdAt: "desc" }],
+          });
+
+          wrongQuestions = incorrectRecords
+            .map((rec) => rec.question)
+            .filter(Boolean);
+        }
+      }
+
+      // If user has no unmastered questions or not logged in, fallback gracefully
+      if (wrongQuestions.length === 0) {
+        const fallback = await prisma.question.findMany({
+          take: 10,
+          select: {
+            id: true,
+            questionText: true,
+            choice1: true,
+            choice2: true,
+            choice3: true,
+            choice4: true,
+            correctAnswer: true,
+            explanation: true,
+            examSet: {
+              select: {
+                category: true,
+                title: true,
+              },
+            },
+          },
+        });
+        wrongQuestions = fallback;
+      }
+
+      selectedQuestions = wrongQuestions;
     }
 
     // Format final list for client

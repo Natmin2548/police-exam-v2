@@ -173,6 +173,29 @@ export async function POST(request: Request) {
             console.error("Error upserting incorrect question:", err);
           }
         }
+
+        // 4. Mark questions that were previously wrong and now answered correctly as mastered
+        const correctQuestionIds = detailedResults
+          .filter((r) => r.isCorrect)
+          .map((r) => r.id);
+
+        if (correctQuestionIds.length > 0) {
+          try {
+            await prisma.incorrectQuestion.updateMany({
+              where: {
+                userId: dbUser.id,
+                questionId: { in: correctQuestionIds },
+                isMastered: false,
+              },
+              data: {
+                isMastered: true,
+                lastReviewedAt: new Date(),
+              },
+            });
+          } catch (err) {
+            console.error("Error updating mastered incorrect questions:", err);
+          }
+        }
       }
     }
 
