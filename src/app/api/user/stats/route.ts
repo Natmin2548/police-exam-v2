@@ -10,13 +10,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Missing email" }, { status: 400 });
     }
 
-    // Find user in PostgreSQL
+    // Find user in PostgreSQL with minimal required fields
     const dbUser = await prisma.user.findFirst({
       where: {
         email: {
           equals: email,
           mode: "insensitive",
         },
+      },
+      select: {
+        id: true,
+        scoreThai: true,
+        scoreGeneral: true,
+        scoreComputer: true,
+        scoreLaw: true,
+        scoreSocial: true,
+        scoreEnglish: true,
       },
     });
 
@@ -37,9 +46,14 @@ export async function GET(request: Request) {
       });
     }
 
-    // Fetch quiz attempts if any
+    // Fetch quiz attempts with selective projection using the new index
     const attempts = await prisma.quizAttempt.findMany({
       where: { userId: dbUser.id },
+      select: {
+        subject: true,
+        setTitle: true,
+        scorePct: true,
+      },
       orderBy: { createdAt: "desc" },
     });
 
