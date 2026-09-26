@@ -65,17 +65,17 @@ export async function GET(request: Request) {
       },
       include: {
         user: {
-          select: { id: true, email: true, fullName: true, username: true },
+          select: { id: true, email: true, fullName: true, username: true, faceImage: true },
         },
       },
       orderBy: { createdAt: "desc" },
-      take: 200,
+      take: 1000,
     });
 
     // -------------------------------------------------------------------------
-    // 2. Map เป็น LeaderboardRecord
+    // 2. Map เป็น LeaderboardRecord & กรองตาม branch
     // -------------------------------------------------------------------------
-    const candidates: LeaderboardRecord[] = realAttempts.map((att) => {
+    const mappedAttempts: LeaderboardRecord[] = realAttempts.map((att) => {
       const isSuppression =
         (att.setTitle || "").includes("ปราบปราม") ||
         (att.subject || "").includes("ปราบปราม");
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
         id: `att_${att.id}`,
         email: u.email,
         name,
-        avatar: "",
+        avatar: u.faceImage || "",
         branch: isSuppression ? "สายปราบปราม" : "สายอำนวยการ",
         date: formatThaiDate(new Date(att.createdAt)),
         timeText: formatTime(0),
@@ -103,25 +103,36 @@ export async function GET(request: Request) {
       };
     });
 
-    // -------------------------------------------------------------------------
-    // 3. กรองตาม branch + เรียงลำดับ
-    // -------------------------------------------------------------------------
-    let filteredCandidates = candidates;
+    // กรองตาม branch ก่อนคำนวณอันดับ
+    let filteredList = mappedAttempts;
     if (branchFilter === "suppression") {
-      filteredCandidates = candidates.filter((c) => c.branch.includes("ปราบปราม"));
+      filteredList = mappedAttempts.filter((c) => c.branch.includes("ปราบปราม"));
     } else if (branchFilter === "admin") {
-      filteredCandidates = candidates.filter((c) => c.branch.includes("อำนวยการ"));
+      filteredList = mappedAttempts.filter((c) => c.branch.includes("อำนวยการ"));
     }
 
-    const sorted = [...filteredCandidates].sort((a, b) => {
+    // -------------------------------------------------------------------------
+    // 3. รวมคะแนนสูงสุดของแต่ละคน (1 คน = 1 อันดับ ไม่แสดงชื่อซ้ำ)
+    // -------------------------------------------------------------------------
+    const userBestMap = new Map<string, LeaderboardRecord>();
+    for (const record of filteredList) {
+      const userKey = (record.email || record.name).toLowerCase();
+      const existing = userBestMap.get(userKey);
+      if (!existing || record.score > existing.score) {
+        userBestMap.set(userKey, record);
+      }
+    }
+
+    const uniqueCandidates = Array.from(userBestMap.values());
+
+    const sorted = uniqueCandidates.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
-      // ถ้าคะแนนเท่ากัน ใช้เวลาน้อยกว่าอยู่อันดับต้น (0 = ไม่มีข้อมูล ให้ไปท้าย)
       if (a.timeSeconds === 0) return 1;
       if (b.timeSeconds === 0) return -1;
       return a.timeSeconds - b.timeSeconds;
     });
 
-    // ✅ Assign rank จริงๆ (ไม่ hardcode)
+    // ✅ Assign rank จริงๆ (1 คน = 1 อันดับ)
     const rankedList = sorted.map((item, idx) => ({ ...item, rank: idx + 1 }));
 
     // -------------------------------------------------------------------------
@@ -149,34 +160,40 @@ export async function GET(request: Request) {
           date: best.date,
         };
       } else {
-        // ✅ user มี attempt แต่ไม่อยู่ใน filter — หาจาก candidates ทั้งหมด
-        const allMyEntries = candidates.filter(
-          (c) => c.email?.toLowerCase() === email.toLowerCase()
-        );
+        // ✅ user มี attempt แต่ไม่อยู่ใน filter — หาจาก mappedAttempts ทั้งหมด
+        const allUserBestMap = new Map<string, LeaderboardRecord>();
+        for (const record of mappedAttempts) {
+          const userKey = (record.email || record.name).toLowerCase();
+          const existing = allUserBestMap.get(userKey);
+          if (!existing || record.score > existing.score) {
+            allUserBestMap.set(userKey, record);
+          }
+        }
+        const allUnique = Array.from(allUserBestMap.values());
 
-        if (allMyEntries.length > 0) {
-          const best = allMyEntries.sort((a, b) => b.score - a.score)[0];
+        const myRecord = allUserBestMap.get(email.toLowerCase());
 
-          // คำนวณ rank จาก candidates ทั้งหมด (ไม่ filtered)
-          const allSorted = [...candidates].sort((a, b) => {
+        if (myRecord) {
+          // คำนวณ rank จากทั้งหมด (ไม่ filtered)
+          const allSorted = allUnique.sort((a, b) => {
             if (b.score !== a.score) return b.score - a.score;
             if (a.timeSeconds === 0) return 1;
             if (b.timeSeconds === 0) return -1;
             return a.timeSeconds - b.timeSeconds;
           });
           const myRankIndex = allSorted.findIndex(
-            (c) => c.email?.toLowerCase() === email.toLowerCase()
+            (c) => (c.email || c.name).toLowerCase() === email.toLowerCase()
           );
 
           myRankData = {
             hasExam: true,
             rank: myRankIndex >= 0 ? myRankIndex + 1 : null,
             totalParticipants: allSorted.length,
-            maxScore: best.score,
-            totalScore: best.total,
-            fastestTime: best.timeText,
-            branch: best.branch,
-            date: best.date,
+            maxScore: myRecord.score,
+            totalScore: myRecord.total,
+            fastestTime: myRecord.timeText,
+            branch: myRecord.branch,
+            date: myRecord.date,
           };
         }
       }
@@ -198,8 +215,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       { myRank: myRankData, leaderboard: rankedList, totalCount: rankedList.length },
       {
-        // ✅ Cache 2 นาที — leaderboard ไม่ต้อง realtime มาก
-        headers: { "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300" },
+        headers: { "Cache-Control": "no-store, max-age=0" },
       }
     );
   } catch (error: any) {
