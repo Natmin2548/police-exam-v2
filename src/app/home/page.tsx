@@ -24,6 +24,7 @@ import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 import { MobileBottomNav } from "@/components/navigation/MobileBottomNav";
 import SupportModal from "@/components/SupportModal";
+import { NotificationsModal } from "@/components/home/NotificationsModal";
 
 interface Recommendation {
   badge: string;
@@ -126,6 +127,9 @@ export default function HomePage() {
   const [stats, setStats] = useState<UserStats>(defaultStats);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   useEffect(() => {
     // Load cached stats if available
@@ -273,6 +277,43 @@ export default function HomePage() {
     fetchUserStats();
   }, [user?.email]);
 
+  const fetchNotifications = React.useCallback(async () => {
+    if (!user?.email) return;
+    try {
+      const res = await fetch(
+        `/api/user/notifications?email=${encodeURIComponent(user.email)}&_t=${Date.now()}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+        setUnreadNotificationsCount(data.unreadCount || 0);
+      }
+    } catch (e) {
+      console.error("Failed to load notifications:", e);
+    }
+  }, [user?.email]);
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  const handleMarkAllRead = async () => {
+    if (!user?.email) return;
+    try {
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadNotificationsCount(0);
+      await fetch("/api/user/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markAll: true, email: user.email }),
+      });
+    } catch (e) {
+      console.error("Failed to mark all read:", e);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.replace("/");
@@ -359,10 +400,16 @@ export default function HomePage() {
             {/* Notification Bell */}
             <button
               type="button"
-              className="w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:text-[#BD1B0B] hover:border-red-200 transition-colors shadow-2xs cursor-pointer"
+              onClick={() => setShowNotificationsModal(true)}
+              className="relative w-10 h-10 rounded-full border border-slate-200 bg-white flex items-center justify-center text-slate-600 hover:text-[#BD1B0B] hover:border-red-200 transition-colors shadow-2xs cursor-pointer"
               aria-label="แจ้งเตือน"
             >
               <Bell className="w-4 h-4" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-[#BD1B0B] text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-xs animate-pulse">
+                  {unreadNotificationsCount > 9 ? "9+" : unreadNotificationsCount}
+                </span>
+              )}
             </button>
 
             {/* User Profile Pill */}
@@ -429,12 +476,19 @@ export default function HomePage() {
                           type="button"
                           onClick={() => {
                             setShowProfileMenu(false);
-                            alert("ไม่มีการแจ้งเตือนใหม่ในขณะนี้");
+                            setShowNotificationsModal(true);
                           }}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold transition-colors cursor-pointer text-left"
+                          className="w-full flex items-center justify-between px-3 py-2.5 rounded-2xl hover:bg-slate-50 text-slate-800 text-xs sm:text-sm font-bold transition-colors cursor-pointer text-left"
                         >
-                          <Bell className="w-4 h-4 text-slate-700 shrink-0" />
-                          <span>การแจ้งเตือน</span>
+                          <div className="flex items-center gap-3">
+                            <Bell className="w-4 h-4 text-slate-700 shrink-0" />
+                            <span>การแจ้งเตือน</span>
+                          </div>
+                          {unreadNotificationsCount > 0 && (
+                            <span className="px-1.5 py-0.5 bg-[#BD1B0B] text-white text-[10px] font-black rounded-full">
+                              {unreadNotificationsCount}
+                            </span>
+                          )}
                         </button>
 
                         {/* 2. จัดการระบบ (Admin Panel) - ONLY visible if ADMIN */}
@@ -837,6 +891,14 @@ export default function HomePage() {
 
       {/* Mobile Full-Width Bottom Nav */}
       <MobileBottomNav />
+
+      {/* Notifications Modal */}
+      <NotificationsModal
+        isOpen={showNotificationsModal}
+        onClose={() => setShowNotificationsModal(false)}
+        notifications={notifications}
+        onMarkAllRead={handleMarkAllRead}
+      />
 
       {/* Support Modal */}
       {showSupportModal && (

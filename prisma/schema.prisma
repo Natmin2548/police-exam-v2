@@ -43,6 +43,7 @@ model User {
   supportTickets     SupportTicket[]
   quizAttempts       QuizAttempt[]
   examSessions       ExamSession[]
+  notifications      Notification[]
 
   @@index([role])
 }
@@ -208,23 +209,51 @@ model Bookmark {
 }
 
 model ReportedQuestion {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   userId       Int
   questionId   String
-  questionText String   @db.Text
-  reason       String   @db.Text
-  createdAt    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionText String    @db.Text
+  reason       String    @db.Text
+  status       String    @default("PENDING") // PENDING, RESOLVED
+  adminReply   String?   @db.Text
+  resolvedAt   DateTime?
+  resolvedBy   String?
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
 }
 
 model SupportTicket {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message    String    @db.Text
+  status     String    @default("PENDING") // PENDING, RESOLVED
+  adminReply String?   @db.Text
+  resolvedAt DateTime?
+  resolvedBy String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Notification {
   id        Int      @id @default(autoincrement())
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
   message   String   @db.Text
-  status    String   @default("PENDING")
+  type      String   @default("INFO") // SUPPORT_REPLY, QUESTION_RESOLVED, SYSTEM
+  isRead    Boolean  @default(false)
+  link      String?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  @@index([userId, isRead])
+  @@index([createdAt])
 }
 
 model KnowledgeDocument {
