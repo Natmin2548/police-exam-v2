@@ -28,8 +28,13 @@ function formatTime(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  if (hours > 0) return `${hours} ชม. ${minutes} นาที`;
-  return `${minutes} นาที ${secs} วิ`;
+  if (hours > 0) {
+    return minutes > 0 ? `${hours} ชม. ${minutes} น.` : `${hours} ชม.`;
+  }
+  if (minutes > 0) {
+    return secs > 0 ? `${minutes} น. ${secs} วิ` : `${minutes} นาที`;
+  }
+  return `${secs} วิ`;
 }
 
 function formatThaiDate(d: Date): string {
@@ -88,6 +93,7 @@ export async function GET(request: Request) {
         att.correctCount > 0
           ? att.correctCount
           : Math.round(((att.scorePct || 0) / 100) * (att.totalQuestions || 150));
+      const durationSeconds = (att as any).timeSpentSeconds || 0;
 
       return {
         id: `att_${att.id}`,
@@ -96,8 +102,8 @@ export async function GET(request: Request) {
         avatar: u.faceImage || "",
         branch: isSuppression ? "สายปราบปราม" : "สายอำนวยการ",
         date: formatThaiDate(new Date(att.createdAt)),
-        timeText: formatTime(0),
-        timeSeconds: 0,
+        timeText: formatTime(durationSeconds),
+        timeSeconds: durationSeconds,
         score: rawScore,
         total: att.totalQuestions || 150,
       };

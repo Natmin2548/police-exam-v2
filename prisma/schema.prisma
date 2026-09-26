@@ -275,6 +275,7 @@ model QuizAttempt {
   scorePct       Int      @default(0)
   correctCount   Int      @default(0)
   totalQuestions Int      @default(0)
+  timeSpentSeconds Int    @default(0)
   createdAt      DateTime @default(now())
 
   @@index([userId])

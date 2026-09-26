@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
             scorePct,
             correctCount,
             totalQuestions,
+            timeSpentSeconds: timeSpentSeconds || 0,
           },
         });
 
