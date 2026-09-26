@@ -22,13 +22,13 @@ export const MobileBottomNav = () => {
       isActive: pathname === "/archive",
     },
     {
-      label: "คำศัพท์",
+      label: "คลังคำศัพท์",
       href: "/vocab",
       icon: BookOpen,
       isActive: pathname === "/vocab",
     },
     {
-      label: "อันดับ",
+      label: "จัดอันดับ",
       href: "/rank",
       icon: Trophy,
       isActive: pathname === "/rank",
@@ -36,21 +36,23 @@ export const MobileBottomNav = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 py-2 px-6 shadow-lg shadow-slate-900/5 flex items-center justify-around lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 py-1.5 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] shadow-lg shadow-slate-900/5 flex items-center justify-between lg:hidden">
       {navItems.map((item) => {
         const Icon = item.icon;
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex flex-col items-center gap-1 transition-all py-1 px-4 rounded-xl cursor-pointer ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl transition-all cursor-pointer active:scale-95 touch-manipulation ${
               item.isActive
                 ? "text-[#BD1B0B] font-black"
                 : "text-slate-400 hover:text-slate-600 font-bold"
             }`}
           >
             <Icon className={`w-5 h-5 ${item.isActive ? "stroke-[2.5]" : "stroke-2"}`} />
-            <span className="text-[11px] leading-none">{item.label}</span>
+            <span className="text-[10px] sm:text-[11px] leading-none text-center whitespace-nowrap">
+              {item.label}
+            </span>
           </Link>
         );
       })}

@@ -12,6 +12,14 @@ export const LandingPage: React.FC = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  React.useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        window.location.replace("/home");
+      }
+    });
+  }, []);
+
   const handleOpenLogin = () => setIsLoginModalOpen(true);
   const handleCloseLogin = () => setIsLoginModalOpen(false);
 
