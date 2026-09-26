@@ -1,15 +1,36 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { normalizeCategoryQuery } from "@/lib/categoryUtils";
+import { getEmailSafe } from "@/lib/supabaseServer";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
-// Helper to randomly sample N items from an array
+// =============================================================================
+// Helper: สุ่ม N ข้อจาก array
+// =============================================================================
 function sampleRandom<T>(items: T[], n: number): T[] {
   const shuffled = [...items].sort(() => 0.5 - Math.random());
   return shuffled.slice(0, n);
 }
 
+// Select fields ที่ใช้ซ้ำ
+const questionSelect = {
+  id: true,
+  questionText: true,
+  choice1: true,
+  choice2: true,
+  choice3: true,
+  choice4: true,
+  correctAnswer: true,
+  explanation: true,
+  examSet: {
+    select: { category: true, title: true },
+  },
+} as const;
+
+// =============================================================================
+// GET /api/exam/generate
+// =============================================================================
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -17,143 +38,75 @@ export async function GET(request: Request) {
     const category = searchParams.get("category") || "ภาษาไทย";
     const count = parseInt(searchParams.get("count") || "30", 10);
 
-    let catQuery = category;
-    if (category.includes("กฎ") || category.includes("กฏ") || category.includes("หมาย")) {
-      catQuery = "กฏหมาย";
-    } else if (category.includes("คอม")) {
-      catQuery = "คอม";
-    } else if (category.includes("ไทย")) {
-      catQuery = "ภาษาไทย";
-    } else if (category.includes("อังกฤษ") || category.toLowerCase().includes("eng")) {
-      catQuery = "ภาษาอังกฤษ";
-    } else if (category.includes("ทั่วไป") || category.includes("ความสามารถ")) {
-      catQuery = "ทั่วไป";
-    } else if (category.includes("สังคม")) {
-      catQuery = "สังคม";
-    } else if (category.includes("๕๔") || category.includes("54") || category.includes("ตำรวจ")) {
-      catQuery = "สารบรรณตำรวจ_๕๔";
-    } else if (category.includes("สารบรรณ") || category.includes("๒๕๒๖") || category.includes("2526")) {
-      catQuery = "งานสารบรรณ_๒๕๒๖";
-    }
-
     let selectedQuestions: any[] = [];
 
+    // -------------------------------------------------------------------------
+    // Mode: subject_single — ข้อสอบรายวิชาเดียว
+    // -------------------------------------------------------------------------
     if (mode === "subject_single") {
-      // 1. Find all question IDs for this category
+      const catQuery = normalizeCategoryQuery(category);
       const questions = await prisma.question.findMany({
         where: {
+          examSet: { category: { contains: catQuery, mode: "insensitive" } },
+        },
+        select: questionSelect,
+      });
+      selectedQuestions = sampleRandom(questions, Math.min(count, questions.length));
+    }
+
+    // -------------------------------------------------------------------------
+    // Mode: pretest — ดึงข้อสอบทุก category ในคราวเดียว แล้ว group ใน memory
+    // -------------------------------------------------------------------------
+    else if (mode === "pretest_suppression" || mode === "pretest_admin") {
+      const distribution =
+        mode === "pretest_suppression"
+          ? [
+              { category: "ทั่วไป",       count: 30 },
+              { category: "ภาษาไทย",      count: 25 },
+              { category: "ภาษาอังกฤษ",   count: 30 },
+              { category: "กฏหมาย",       count: 30 },
+              { category: "คอม",           count: 25 },
+              { category: "สังคม",         count: 10 },
+            ]
+          : [
+              { category: "ทั่วไป",               count: 20 },
+              { category: "ภาษาไทย",              count: 20 },
+              { category: "ภาษาอังกฤษ",           count: 15 },
+              { category: "คอม",                   count: 40 },
+              { category: "งานสารบรรณ_๒๕๒๖",     count: 20 },
+              { category: "สารบรรณตำรวจ_๕๔",     count: 10 },
+              { category: "กฏหมาย",               count: 25 },
+            ];
+
+      const categoryList = distribution.map((d) => d.category);
+
+      // ✅ ดึง DB ครั้งเดียว ด้วย OR condition แทน N queries
+      const allQuestions = await prisma.question.findMany({
+        where: {
           examSet: {
-            category: {
-              contains: catQuery,
-              mode: "insensitive",
-            },
+            OR: categoryList.map((cat) => ({
+              category: { contains: cat, mode: "insensitive" as const },
+            })),
           },
         },
-        select: {
-          id: true,
-          questionText: true,
-          choice1: true,
-          choice2: true,
-          choice3: true,
-          choice4: true,
-          correctAnswer: true,
-          explanation: true,
-          examSet: {
-            select: {
-              category: true,
-              title: true,
-            },
-          },
-        },
+        select: questionSelect,
       });
 
-      const sampled = sampleRandom(questions, Math.min(count, questions.length));
-      selectedQuestions = sampled;
-    } else if (mode === "pretest_suppression") {
-      // Pretest สายปราบปราม (150 ข้อ)
-      const distribution = [
-        { category: "ทั่วไป", count: 30, subjectName: "ความสามารถทั่วไป" },
-        { category: "ภาษาไทย", count: 25, subjectName: "ภาษาไทย" },
-        { category: "ภาษาอังกฤษ", count: 30, subjectName: "ภาษาอังกฤษ" },
-        { category: "กฏหมาย", count: 30, subjectName: "กฎหมายที่ประชาชนควรรู้" },
-        { category: "คอม", count: 25, subjectName: "คอมพิวเตอร์และสารสนเทศ" },
-        { category: "สังคม", count: 10, subjectName: "สังคมและวัฒนธรรม" },
-      ];
-
+      // Group ใน memory
       for (const dist of distribution) {
-        const pool = await prisma.question.findMany({
-          where: {
-            examSet: {
-              category: {
-                contains: dist.category,
-                mode: "insensitive",
-              },
-            },
-          },
-          select: {
-            id: true,
-            questionText: true,
-            choice1: true,
-            choice2: true,
-            choice3: true,
-            choice4: true,
-            correctAnswer: true,
-            explanation: true,
-            examSet: {
-              select: {
-                category: true,
-                title: true,
-              },
-            },
-          },
-        });
-        const sampled = sampleRandom(pool, dist.count);
-        selectedQuestions.push(...sampled);
+        const pool = allQuestions.filter((q) =>
+          (q.examSet?.category || "")
+            .toLowerCase()
+            .includes(dist.category.toLowerCase())
+        );
+        selectedQuestions.push(...sampleRandom(pool, dist.count));
       }
-    } else if (mode === "pretest_admin") {
-      // Pretest สายอำนวยการ (150 ข้อ) - โครงสร้างตามประกาศ สกส. ล่าสุด
-      const distribution = [
-        { category: "ทั่วไป", count: 20, subjectName: "ความสามารถทั่วไป" },
-        { category: "ภาษาไทย", count: 20, subjectName: "ภาษาไทย" },
-        { category: "ภาษาอังกฤษ", count: 15, subjectName: "ภาษาอังกฤษ" },
-        { category: "คอม", count: 40, subjectName: "คอมพิวเตอร์และสารสนเทศ" },
-        { category: "งานสารบรรณ_๒๕๒๖", count: 20, subjectName: "งานสารบรรณ (๒๕๒๖)" },
-        { category: "สารบรรณตำรวจ_๕๔", count: 10, subjectName: "ระเบียบตำรวจ ลักษณะที่ ๕๔" },
-        { category: "กฏหมาย", count: 25, subjectName: "กฎหมายและสังคม" },
-      ];
+    }
 
-      for (const dist of distribution) {
-        const pool = await prisma.question.findMany({
-          where: {
-            examSet: {
-              category: {
-                contains: dist.category,
-                mode: "insensitive",
-              },
-            },
-          },
-          select: {
-            id: true,
-            questionText: true,
-            choice1: true,
-            choice2: true,
-            choice3: true,
-            choice4: true,
-            correctAnswer: true,
-            explanation: true,
-            examSet: {
-              select: {
-                category: true,
-                title: true,
-              },
-            },
-          },
-        });
-        const sampled = sampleRandom(pool, dist.count);
-        selectedQuestions.push(...sampled);
-      }
-    } else if (mode === "chapter") {
-      // Chapter exam from specific ExamSets
+    // -------------------------------------------------------------------------
+    // Mode: chapter — จาก ExamSet IDs ที่ระบุ
+    // -------------------------------------------------------------------------
+    else if (mode === "chapter") {
       const setIdsParam = searchParams.get("setIds");
       const ids = setIdsParam
         ? setIdsParam
@@ -163,110 +116,53 @@ export async function GET(request: Request) {
         : [];
 
       if (ids.length > 0) {
-        const chapterQuestions = await prisma.question.findMany({
-          where: {
-            examSetId: { in: ids },
-          },
-          select: {
-            id: true,
-            questionText: true,
-            choice1: true,
-            choice2: true,
-            choice3: true,
-            choice4: true,
-            correctAnswer: true,
-            explanation: true,
-            examSet: {
-              select: {
-                category: true,
-                title: true,
-              },
-            },
-          },
+        const questions = await prisma.question.findMany({
+          where: { examSetId: { in: ids } },
+          select: questionSelect,
         });
         const limit = Math.min(count > 0 ? count : 20, 20);
-        selectedQuestions = sampleRandom(
-          chapterQuestions,
-          Math.min(limit, chapterQuestions.length)
-        );
+        selectedQuestions = sampleRandom(questions, Math.min(limit, questions.length));
       }
-    } else if (mode === "review_incorrect") {
-      const email = searchParams.get("email");
+    }
+
+    // -------------------------------------------------------------------------
+    // Mode: review_incorrect — ข้อที่เคยตอบผิด (ต้องล็อกอิน)
+    // -------------------------------------------------------------------------
+    else if (mode === "review_incorrect") {
+      // ✅ ใช้ token จาก Authorization header ถ้ามี, fallback query param
+      const emailParam = searchParams.get("email");
+      const email = await getEmailSafe(request, emailParam || undefined);
       let wrongQuestions: any[] = [];
 
       if (email) {
         const dbUser = await prisma.user.findFirst({
-          where: {
-            email: {
-              equals: email,
-              mode: "insensitive",
-            },
-          },
+          where: { email: { equals: email, mode: "insensitive" } },
         });
 
         if (dbUser) {
           const incorrectRecords = await prisma.incorrectQuestion.findMany({
-            where: {
-              userId: dbUser.id,
-              isMastered: false,
-            },
-            include: {
-              question: {
-                select: {
-                  id: true,
-                  questionText: true,
-                  choice1: true,
-                  choice2: true,
-                  choice3: true,
-                  choice4: true,
-                  correctAnswer: true,
-                  explanation: true,
-                  examSet: {
-                    select: {
-                      category: true,
-                      title: true,
-                    },
-                  },
-                },
-              },
-            },
+            where: { userId: dbUser.id, isMastered: false },
+            include: { question: { select: questionSelect } },
             orderBy: [{ wrongCount: "desc" }, { createdAt: "desc" }],
           });
-
-          wrongQuestions = incorrectRecords
-            .map((rec) => rec.question)
-            .filter(Boolean);
+          wrongQuestions = incorrectRecords.map((rec) => rec.question).filter(Boolean);
         }
       }
 
-      // If user has no unmastered questions or not logged in, fallback gracefully
+      // Fallback ถ้าไม่มี wrong questions
       if (wrongQuestions.length === 0) {
-        const fallback = await prisma.question.findMany({
+        wrongQuestions = await prisma.question.findMany({
           take: 10,
-          select: {
-            id: true,
-            questionText: true,
-            choice1: true,
-            choice2: true,
-            choice3: true,
-            choice4: true,
-            correctAnswer: true,
-            explanation: true,
-            examSet: {
-              select: {
-                category: true,
-                title: true,
-              },
-            },
-          },
+          select: questionSelect,
         });
-        wrongQuestions = fallback;
       }
 
       selectedQuestions = wrongQuestions;
     }
 
-    // Format final list for client
+    // -------------------------------------------------------------------------
+    // Format output
+    // -------------------------------------------------------------------------
     const formattedQuestions = selectedQuestions.map((q, idx) => ({
       index: idx + 1,
       id: q.id,
@@ -279,14 +175,14 @@ export async function GET(request: Request) {
     }));
 
     return NextResponse.json(
-      {
-        total: formattedQuestions.length,
-        mode,
-        questions: formattedQuestions,
-      },
+      { total: formattedQuestions.length, mode, questions: formattedQuestions },
       {
         headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          // ✅ Cache 1 นาทีสำหรับ pretest (ข้อสอบไม่เปลี่ยนบ่อย)
+          "Cache-Control":
+            mode.startsWith("pretest") || mode === "chapter"
+              ? "public, s-maxage=60, stale-while-revalidate=300"
+              : "no-store",
         },
       }
     );

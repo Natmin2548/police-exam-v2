@@ -341,6 +341,12 @@ export default function HomePage() {
               คลังข้อสอบ
             </Link>
             <Link
+              href="/vocab"
+              className="px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-slate-600 hover:text-slate-900"
+            >
+              คลังคำศัพท์
+            </Link>
+            <Link
               href="/rank"
               className="px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-slate-600 hover:text-slate-900"
             >
@@ -529,12 +535,20 @@ export default function HomePage() {
               </Link>
 
               {/* Card 4: คลังคำศัพท์ */}
-              <div className="bg-white border border-slate-100 hover:border-slate-300 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer">
-                <h3 className="text-base font-black text-slate-900 mb-0.5">
-                  คลังคำศัพท์
-                </h3>
-                <p className="text-xs text-slate-400 font-medium">เลือกด่วน !</p>
-              </div>
+              <Link
+                href="/vocab"
+                className="bg-white border border-slate-100 hover:border-red-200 rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-all cursor-pointer block group"
+              >
+                <div className="flex items-center justify-between mb-0.5">
+                  <h3 className="text-base font-black text-slate-900 group-hover:text-[#BD1B0B] transition-colors">
+                    คลังคำศัพท์
+                  </h3>
+                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-red-50 text-[#BD1B0B] border border-red-100">
+                    3,000 คำ
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 font-medium">A1-C1 • เลือกด่วน !</p>
+              </Link>
             </div>
 
             {/* Section: สถิติ (Shown on Mobile only - clean & simple) */}

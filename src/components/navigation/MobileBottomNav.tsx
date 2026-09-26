@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, BookMarked, Trophy } from "lucide-react";
+import { Home, BookMarked, Trophy, BookOpen } from "lucide-react";
 
 export const MobileBottomNav = () => {
   const pathname = usePathname();
@@ -16,10 +16,16 @@ export const MobileBottomNav = () => {
       isActive: pathname === "/home" || pathname === "/",
     },
     {
-      label: "คลัง",
+      label: "คลังข้อสอบ",
       href: "/archive",
       icon: BookMarked,
       isActive: pathname === "/archive",
+    },
+    {
+      label: "คำศัพท์",
+      href: "/vocab",
+      icon: BookOpen,
+      isActive: pathname === "/vocab",
     },
     {
       label: "อันดับ",

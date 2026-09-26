@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
+// =============================================================================
+// Types
+// =============================================================================
 interface LeaderboardRecord {
   id: string;
   name: string;
@@ -15,138 +17,25 @@ interface LeaderboardRecord {
   timeSeconds: number;
   score: number;
   total: number;
+  rank?: number;
 }
 
-// Seed top participants matching the reference design to ensure rich leaderboard
-const seedTopParticipants: LeaderboardRecord[] = [
-  {
-    id: "seed_1",
-    name: "Jj K",
-    avatar: "",
-    branch: "สายอำนวยการ",
-    date: "18 ก.ย. 69",
-    timeText: "23 นาที 7 วิ",
-    timeSeconds: 1387,
-    score: 134,
-    total: 150,
-  },
-  {
-    id: "seed_2",
-    name: "Saranphat Inpinit",
-    avatar: "",
-    branch: "สายอำนวยการ",
-    date: "16 ก.ย. 69",
-    timeText: "1 ชม. 15 นาที",
-    timeSeconds: 4500,
-    score: 129,
-    total: 150,
-  },
-  {
-    id: "seed_3",
-    name: "SPRINGTER Psycho",
-    avatar: "",
-    branch: "สายอำนวยการ",
-    date: "17 ก.ย. 69",
-    timeText: "1 ชม. 38 นาที",
-    timeSeconds: 5880,
-    score: 125,
-    total: 150,
-  },
-  {
-    id: "seed_4",
-    name: "Narakorn Arrampajit",
-    avatar: "",
-    branch: "สายอำนวยการ",
-    date: "18 ก.ย. 69",
-    timeText: "2 ชม. 11 นาที",
-    timeSeconds: 7860,
-    score: 121,
-    total: 150,
-  },
-  {
-    id: "seed_5",
-    name: "จิรทีปต์ จันทรักษ์",
-    avatar: "",
-    branch: "สายอำนวยการ",
-    date: "16 ก.ย. 69",
-    timeText: "2 ชม. 2 นาที",
-    timeSeconds: 7320,
-    score: 116,
-    total: 150,
-  },
-  {
-    id: "seed_6",
-    name: "Hello catty",
-    avatar: "",
-    branch: "สายอำนวยการ",
-    date: "16 ก.ย. 69",
-    timeText: "26 นาที 46 วิ",
-    timeSeconds: 1606,
-    score: 112,
-    total: 150,
-  },
-  {
-    id: "seed_7",
-    name: "ฐานิดา แหล่งสนาม",
-    avatar: "",
-    branch: "สายอำนวยการ",
-    date: "15 ก.ย. 69",
-    timeText: "1 ชม. 43 นาที",
-    timeSeconds: 6180,
-    score: 112,
-    total: 150,
-  },
-  {
-    id: "seed_8",
-    name: "กิตติศักดิ์ พรหมมาศ",
-    avatar: "",
-    branch: "สายปราบปราม",
-    date: "17 ก.ย. 69",
-    timeText: "1 ชม. 22 นาที",
-    timeSeconds: 4920,
-    score: 110,
-    total: 150,
-  },
-  {
-    id: "seed_9",
-    name: "ปิยพงษ์ สิทธิเดช",
-    avatar: "",
-    branch: "สายปราบปราม",
-    date: "18 ก.ย. 69",
-    timeText: "1 ชม. 45 นาที",
-    timeSeconds: 6300,
-    score: 108,
-    total: 150,
-  },
-  {
-    id: "seed_10",
-    name: "วรเมธ คงเจริญ",
-    avatar: "",
-    branch: "สายปราบปราม",
-    date: "16 ก.ย. 69",
-    timeText: "2 ชม. 5 นาที",
-    timeSeconds: 7500,
-    score: 105,
-    total: 150,
-  },
-];
-
+// =============================================================================
+// Helpers
+// =============================================================================
 function formatTime(seconds: number): string {
-  if (!seconds || seconds <= 0) return "2 นาที 40 วิ";
+  if (!seconds || seconds <= 0) return "-";
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-
-  if (hours > 0) {
-    return `${hours} ชม. ${minutes} นาที`;
-  }
+  if (hours > 0) return `${hours} ชม. ${minutes} นาที`;
   return `${minutes} นาที ${secs} วิ`;
 }
 
 function formatThaiDate(d: Date): string {
   const months = [
     "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
-    "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
+    "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
   ];
   const day = d.getDate();
   const month = months[d.getMonth()];
@@ -154,124 +43,141 @@ function formatThaiDate(d: Date): string {
   return `${day} ${month} ${year}`;
 }
 
+// =============================================================================
+// GET /api/leaderboard
+// =============================================================================
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const email = searchParams.get("email") || "";
-    const branchFilter = searchParams.get("branch") || "all"; // all, suppression, admin
+    const branchFilter = searchParams.get("branch") || "all";
 
-    // 1. Fetch real user attempts from database
-    let realAttempts: any[] = [];
-    try {
-      realAttempts = await prisma.quizAttempt.findMany({
-        where: {
-          OR: [
-            { totalQuestions: { gte: 100 } },
-            { setTitle: { contains: "150" } },
-            { setTitle: { contains: "Pretest" } },
-          ],
+    // -------------------------------------------------------------------------
+    // 1. ดึง attempt จาก DB (เฉพาะ pretest / 100+ ข้อ)
+    // -------------------------------------------------------------------------
+    const realAttempts = await prisma.quizAttempt.findMany({
+      where: {
+        OR: [
+          { totalQuestions: { gte: 100 } },
+          { setTitle: { contains: "150" } },
+          { setTitle: { contains: "Pretest" } },
+        ],
+      },
+      include: {
+        user: {
+          select: { id: true, email: true, fullName: true, username: true },
         },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              fullName: true,
-              username: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      });
-    } catch (e) {
-      console.warn("Could not fetch quiz attempts:", e);
-    }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
 
-    // Map real attempts to candidate list
-    const realCandidates = realAttempts.map((att) => {
-      const isSuppression = (att.setTitle || "").includes("ปราบปราม") || (att.subject || "").includes("ปราบปราม");
-      const branchName = isSuppression ? "สายปราบปราม" : "สายอำนวยการ";
+    // -------------------------------------------------------------------------
+    // 2. Map เป็น LeaderboardRecord
+    // -------------------------------------------------------------------------
+    const candidates: LeaderboardRecord[] = realAttempts.map((att) => {
+      const isSuppression =
+        (att.setTitle || "").includes("ปราบปราม") ||
+        (att.subject || "").includes("ปราบปราม");
       const u = att.user;
-      const name = u.fullName && u.fullName.trim().length > 0 ? u.fullName : u.username || u.email.split("@")[0];
-      const rawScore = att.correctCount > 0 ? att.correctCount : Math.round(((att.scorePct || 0) / 100) * 150);
+      const name =
+        u.fullName && u.fullName.trim().length > 0
+          ? u.fullName
+          : u.username || u.email.split("@")[0];
+      const rawScore =
+        att.correctCount > 0
+          ? att.correctCount
+          : Math.round(((att.scorePct || 0) / 100) * (att.totalQuestions || 150));
 
       return {
-        id: `real_${att.id}`,
+        id: `att_${att.id}`,
         email: u.email,
         name,
         avatar: "",
-        branch: branchName,
+        branch: isSuppression ? "สายปราบปราม" : "สายอำนวยการ",
         date: formatThaiDate(new Date(att.createdAt)),
-        timeText: formatTime(att.timeSpentSeconds || 160),
-        timeSeconds: att.timeSpentSeconds || 160,
+        timeText: formatTime(0),
+        timeSeconds: 0,
         score: rawScore,
-        total: 150,
+        total: att.totalQuestions || 150,
       };
     });
 
-    // 2. Combine with seed participants to form full ranking
-    const combined: LeaderboardRecord[] = [...realCandidates, ...seedTopParticipants];
+    // -------------------------------------------------------------------------
+    // 3. กรองตาม branch + เรียงลำดับ
+    // -------------------------------------------------------------------------
+    let filteredCandidates = candidates;
+    if (branchFilter === "suppression") {
+      filteredCandidates = candidates.filter((c) => c.branch.includes("ปราบปราม"));
+    } else if (branchFilter === "admin") {
+      filteredCandidates = candidates.filter((c) => c.branch.includes("อำนวยการ"));
+    }
 
-    // Deduplicate by name/email and sort by score desc, then timeSeconds asc
-    const sorted = combined.sort((a, b) => {
+    const sorted = [...filteredCandidates].sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
+      // ถ้าคะแนนเท่ากัน ใช้เวลาน้อยกว่าอยู่อันดับต้น (0 = ไม่มีข้อมูล ให้ไปท้าย)
+      if (a.timeSeconds === 0) return 1;
+      if (b.timeSeconds === 0) return -1;
       return a.timeSeconds - b.timeSeconds;
     });
 
-    // Assign rank numbers
-    const rankedList = sorted.map((item, idx) => ({
-      ...item,
-      rank: idx + 1,
-    }));
+    // ✅ Assign rank จริงๆ (ไม่ hardcode)
+    const rankedList = sorted.map((item, idx) => ({ ...item, rank: idx + 1 }));
 
-    // 3. Determine current user's ranking
+    // -------------------------------------------------------------------------
+    // 4. หา rank ของ user ปัจจุบัน (จาก email)
+    // -------------------------------------------------------------------------
     let myRankData = null;
+
     if (email) {
-      const userMatches = rankedList.filter((item) => item.email && item.email.toLowerCase() === email.toLowerCase());
-      if (userMatches.length > 0) {
-        const best = userMatches[0];
+      // หาใน rankedList ก่อน
+      const myEntries = rankedList.filter(
+        (item) => item.email?.toLowerCase() === email.toLowerCase()
+      );
+
+      if (myEntries.length > 0) {
+        // ✅ best attempt ของ user
+        const best = myEntries[0];
         myRankData = {
           hasExam: true,
           rank: best.rank,
           totalParticipants: rankedList.length,
           maxScore: best.score,
-          totalScore: 150,
+          totalScore: best.total,
           fastestTime: best.timeText,
           branch: best.branch,
           date: best.date,
         };
       } else {
-        // Look in DB user's past attempts
-        try {
-          const userObj = await prisma.user.findFirst({
-            where: { email: { equals: email, mode: "insensitive" } },
-            include: {
-              quizAttempts: {
-                orderBy: { createdAt: "desc" },
-                take: 5,
-              },
-            },
-          });
+        // ✅ user มี attempt แต่ไม่อยู่ใน filter — หาจาก candidates ทั้งหมด
+        const allMyEntries = candidates.filter(
+          (c) => c.email?.toLowerCase() === email.toLowerCase()
+        );
 
-          if (userObj && userObj.quizAttempts.length > 0) {
-            const bestAtt = [...userObj.quizAttempts].sort((a, b) => (b.scorePct || 0) - (a.scorePct || 0))[0];
-            const rawScore = bestAtt.correctCount > 0 ? bestAtt.correctCount : Math.round(((bestAtt.scorePct || 0) / 100) * 150);
-            const isSupp = (bestAtt.setTitle || "").includes("ปราบปราม") || (bestAtt.subject || "").includes("ปราบปราม");
-            
-            myRankData = {
-              hasExam: true,
-              rank: 33, // Default calculated rank
-              totalParticipants: rankedList.length + 15,
-              maxScore: rawScore > 0 ? rawScore : 42,
-              totalScore: 150,
-              fastestTime: "2 นาที 40 วิ",
-              branch: isSupp ? "สายปราบปราม" : "สายอำนวยการ",
-              date: formatThaiDate(new Date(bestAtt.createdAt)),
-            };
-          }
-        } catch (e) {
-          // ignore
+        if (allMyEntries.length > 0) {
+          const best = allMyEntries.sort((a, b) => b.score - a.score)[0];
+
+          // คำนวณ rank จาก candidates ทั้งหมด (ไม่ filtered)
+          const allSorted = [...candidates].sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            if (a.timeSeconds === 0) return 1;
+            if (b.timeSeconds === 0) return -1;
+            return a.timeSeconds - b.timeSeconds;
+          });
+          const myRankIndex = allSorted.findIndex(
+            (c) => c.email?.toLowerCase() === email.toLowerCase()
+          );
+
+          myRankData = {
+            hasExam: true,
+            rank: myRankIndex >= 0 ? myRankIndex + 1 : null,
+            totalParticipants: allSorted.length,
+            maxScore: best.score,
+            totalScore: best.total,
+            fastestTime: best.timeText,
+            branch: best.branch,
+            date: best.date,
+          };
         }
       }
     }
@@ -289,24 +195,11 @@ export async function GET(request: Request) {
       };
     }
 
-    // 4. Filter by branch if requested
-    let filteredList = rankedList;
-    if (branchFilter === "suppression") {
-      filteredList = rankedList.filter((item) => item.branch.includes("ปราบปราม"));
-    } else if (branchFilter === "admin") {
-      filteredList = rankedList.filter((item) => item.branch.includes("อำนวยการ"));
-    }
-
     return NextResponse.json(
+      { myRank: myRankData, leaderboard: rankedList, totalCount: rankedList.length },
       {
-        myRank: myRankData,
-        leaderboard: filteredList,
-        totalCount: rankedList.length,
-      },
-      {
-        headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        },
+        // ✅ Cache 2 นาที — leaderboard ไม่ต้อง realtime มาก
+        headers: { "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300" },
       }
     );
   } catch (error: any) {
