@@ -44,25 +44,29 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(function(reg) {
-                    reg.update();
-                  }).catch(function(err) {
-                    console.log('SW registration failed: ', err);
-                  });
-
-                  if ('caches' in window) {
-                    caches.keys().then(function(keys) {
-                      keys.forEach(function(key) {
-                        if (key !== 'police-exam-v5') {
-                          caches.delete(key);
+              try {
+                if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                  window.addEventListener('load', function() {
+                    try {
+                      navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                        if (reg && typeof reg.update === 'function') {
+                          reg.update().catch(function() {});
                         }
-                      });
-                    });
-                  }
-                });
-              }
+                      }).catch(function() {});
+
+                      if ('caches' in window) {
+                        caches.keys().then(function(keys) {
+                          keys.forEach(function(key) {
+                            if (key !== 'police-exam-v5') {
+                              caches.delete(key).catch(function() {});
+                            }
+                          });
+                        }).catch(function() {});
+                      }
+                    } catch (e) {}
+                  });
+                }
+              } catch (e) {}
             `,
           }}
         />

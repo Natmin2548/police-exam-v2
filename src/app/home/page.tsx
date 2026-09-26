@@ -179,11 +179,11 @@ export default function HomePage() {
             window.location.search.includes("code"));
 
         if (!hasTokens) {
-          window.location.replace("/");
+          window.location.replace("/landing");
         }
       } catch (err) {
         console.error("Auth check failed:", err);
-        window.location.replace("/");
+        window.location.replace("/landing");
       }
     };
 
@@ -191,18 +191,12 @@ export default function HomePage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user);
         setIsAuthChecking(false);
-      } else {
-        const hasTokens =
-          typeof window !== "undefined" &&
-          (window.location.hash.includes("access_token") ||
-            window.location.search.includes("code"));
-        if (!hasTokens) {
-          window.location.replace("/");
-        }
+      } else if (event === "SIGNED_OUT") {
+        window.location.replace("/landing");
       }
     });
 

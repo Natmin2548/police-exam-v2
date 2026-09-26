@@ -150,10 +150,15 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                       {item.message}
                     </p>
                     <span className="text-[10px] text-slate-400 font-medium block">
-                      {new Date(item.createdAt).toLocaleString("th-TH", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
+                      {(() => {
+                        try {
+                          const d = new Date(item.createdAt);
+                          if (isNaN(d.getTime())) return "";
+                          return `${d.toLocaleDateString("th-TH")} ${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+                        } catch {
+                          return "";
+                        }
+                      })()}
                     </span>
                   </div>
                 </div>
