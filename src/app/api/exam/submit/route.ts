@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { categoryToScoreField, subjectStringToScoreField } from "@/lib/categoryUtils";
 import { getEmailSafe } from "@/lib/supabaseServer";
+import { trackMissionProgress } from "@/lib/missionService";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -169,6 +170,12 @@ export async function POST(request: NextRequest) {
           } catch (err) {
             console.error("Error updating mastered questions:", err);
           }
+        }
+
+        // 5. อัปเดตเควสประจำวัน (Gamification)
+        trackMissionProgress(dbUser.id, "EXAM_PRACTICE", questionIds.length).catch(() => {});
+        if (scorePct >= 70) {
+          trackMissionProgress(dbUser.id, "HIGH_ACCURACY", 1).catch(() => {});
         }
       }
     }

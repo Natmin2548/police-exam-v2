@@ -23,10 +23,15 @@ import {
   VolumeX,
   HelpCircle,
   Award,
+  Cloud,
+  CloudOff,
+  Loader2,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { MobileBottomNav } from "@/components/navigation/MobileBottomNav";
 import rawVocabData from "@/data/oxfordVocabData.json";
+import { supabase } from "@/lib/supabaseClient";
+import { authFetch } from "@/lib/authFetch";
 
 interface VocabWord {
   word: string;
@@ -51,10 +56,12 @@ export default function VocabBankPage() {
   const [activeTab, setActiveTab] = useState<"list" | "flashcard" | "quiz">("list");
   const [selectedLevel, setSelectedLevel] = useState<string>("ALL");
 
-  // User LocalStorage Data
+  // User LocalStorage & Cloud Sync Data
   const [bookmarkedWords, setBookmarkedWords] = useState<Set<string>>(new Set());
   const [masteredWords, setMasteredWords] = useState<Set<string>>(new Set());
   const [isLoaded, setIsLoaded] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "offline">("idle");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Search & Filters in List Mode
   const [searchQuery, setSearchQuery] = useState("");
@@ -96,44 +103,130 @@ export default function VocabBankPage() {
   const [speakingWord, setSpeakingWord] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
-  // 1. Load & Persist Bookmarks & Mastered words in LocalStorage
+  // 1. Load LocalStorage & Two-Way Cloud Sync with Database
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    let localB: string[] = [];
+    let localM: string[] = [];
     try {
       const savedBookmarks = localStorage.getItem("police_vocab_bookmarks");
       if (savedBookmarks) {
-        setBookmarkedWords(new Set(JSON.parse(savedBookmarks)));
+        localB = JSON.parse(savedBookmarks);
+        setBookmarkedWords(new Set(localB));
       }
       const savedMastered = localStorage.getItem("police_vocab_mastered");
       if (savedMastered) {
-        setMasteredWords(new Set(JSON.parse(savedMastered)));
+        localM = JSON.parse(savedMastered);
+        setMasteredWords(new Set(localM));
       }
     } catch (e) {
       console.error("Error loading vocab progress:", e);
     } finally {
       setIsLoaded(true);
     }
+
+    // Two-way Cloud Sync
+    const initCloudSync = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session?.user) {
+          setSyncStatus("offline");
+          setIsLoggedIn(false);
+          return;
+        }
+
+        setIsLoggedIn(true);
+        setSyncStatus("syncing");
+
+        const res = await authFetch("/api/vocab/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: "merge",
+            localBookmarks: localB,
+            localMastered: localM,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            const mergedB = new Set<string>(data.bookmarkedWords || []);
+            const mergedM = new Set<string>(data.masteredWords || []);
+            setBookmarkedWords(mergedB);
+            setMasteredWords(mergedM);
+            localStorage.setItem("police_vocab_bookmarks", JSON.stringify(Array.from(mergedB)));
+            localStorage.setItem("police_vocab_mastered", JSON.stringify(Array.from(mergedM)));
+            setSyncStatus("synced");
+          } else {
+            setSyncStatus("idle");
+          }
+        } else {
+          setSyncStatus("idle");
+        }
+      } catch (err) {
+        console.error("Cloud sync error:", err);
+        setSyncStatus("idle");
+      }
+    };
+
+    initCloudSync();
   }, []);
 
-  const toggleBookmark = (word: string) => {
+  const toggleBookmark = useCallback((word: string) => {
     setBookmarkedWords((prev) => {
       const next = new Set(prev);
+      const isNowBookmarked = !next.has(word);
       if (next.has(word)) next.delete(word);
       else next.add(word);
       localStorage.setItem("police_vocab_bookmarks", JSON.stringify(Array.from(next)));
+
+      // Background Cloud Sync
+      if (isLoggedIn) {
+        authFetch("/api/vocab/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: "toggle",
+            word,
+            type: "bookmark",
+            value: isNowBookmarked,
+          }),
+        }).catch((e) => console.error("Sync bookmark error:", e));
+      }
+
       return next;
     });
-  };
+  }, [isLoggedIn]);
 
-  const toggleMastered = (word: string) => {
+  const toggleMastered = useCallback((word: string) => {
     setMasteredWords((prev) => {
       const next = new Set(prev);
+      const isNowMastered = !next.has(word);
       if (next.has(word)) next.delete(word);
       else next.add(word);
       localStorage.setItem("police_vocab_mastered", JSON.stringify(Array.from(next)));
+
+      // Background Cloud Sync
+      if (isLoggedIn) {
+        authFetch("/api/vocab/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: "toggle",
+            word,
+            type: "mastered",
+            value: isNowMastered,
+          }),
+        }).catch((e) => console.error("Sync mastered error:", e));
+      }
+
       return next;
     });
-  };
+  }, [isLoggedIn]);
 
   // ---------------------------------------------------------------------------
   // 2. Text to Speech helper
@@ -248,7 +341,7 @@ export default function VocabBankPage() {
         confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
       } catch (e) {}
     }
-  }, [cardIndex, currentFlashcard, flashcardDeck.length]);
+  }, [cardIndex, currentFlashcard, flashcardDeck.length, toggleMastered]);
 
   const handlePrevCard = useCallback(() => {
     setIsFlipped(false);
@@ -428,13 +521,39 @@ export default function VocabBankPage() {
             </div>
           </div>
 
-          {/* Quick Header Stats */}
-          <div className="hidden sm:flex items-center gap-3 text-xs font-bold">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+          {/* Quick Header Stats & Cloud Sync Status */}
+          <div className="flex items-center gap-2 sm:gap-3 text-xs font-bold">
+            {/* Cloud Status Indicator */}
+            {syncStatus === "syncing" && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span className="hidden xs:inline">ซิงค์...</span>
+              </div>
+            )}
+            {syncStatus === "synced" && (
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs"
+                title="ความคืบหน้าซิงค์กับคลาวด์แล้ว"
+              >
+                <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="hidden xs:inline">บันทึกแล้ว</span>
+              </div>
+            )}
+            {syncStatus === "offline" && (
+              <div
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-100 text-slate-500 border border-slate-200 shadow-2xs"
+                title="โหมดออฟไลน์ (เข้าสู่ระบบเพื่อซิงค์ข้ามอุปกรณ์)"
+              >
+                <CloudOff className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline">ออฟไลน์</span>
+              </div>
+            )}
+
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
               <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
               <span>ติดดาว {bookmarkedWords.size}</span>
             </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
               <span>จำได้แล้ว {masteredWords.size}</span>
             </div>

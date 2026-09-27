@@ -25,6 +25,7 @@ import type { User } from "@supabase/supabase-js";
 import { MobileBottomNav } from "@/components/navigation/MobileBottomNav";
 import SupportModal from "@/components/SupportModal";
 import { NotificationsModal } from "@/components/home/NotificationsModal";
+import { DailyMissionsCard } from "@/components/home/DailyMissionsCard";
 
 interface Recommendation {
   badge: string;
@@ -664,6 +665,9 @@ export default function HomePage() {
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </div>
+
+            {/* Daily Missions & Gamification Widget */}
+            <DailyMissionsCard />
 
             {/* Section: รายวิชา (Clean & Minimal like original) */}
             <div className="bg-white border border-slate-100 rounded-3xl p-5 sm:p-6 shadow-xs">
