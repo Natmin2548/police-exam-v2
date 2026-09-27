@@ -83,7 +83,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "No active question" }, { status: 400 });
       }
 
-      const isCorrect = Number(choice) === Number(currentQ.correctAnswer);
+      const isTimedOut = Boolean(body.timedOut || Number(choice) < 0);
+      const isCorrect = !isTimedOut && Number(choice) === Number(currentQ.correctAnswer);
 
       if (isCorrect) {
         const baseGold = 100;

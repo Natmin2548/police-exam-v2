@@ -110,6 +110,7 @@ export default function ArenaRoomPage() {
   // Mystery Chest State (เมื่อตอบถูก)
   const [showChestModal, setShowChestModal] = useState(false);
   const [isOpeningChest, setIsOpeningChest] = useState(false);
+  const [chestTimeLeft, setChestTimeLeft] = useState(10);
   const [chestOutcome, setChestOutcome] = useState<{
     effectType: string;
     message: string;
@@ -129,9 +130,16 @@ export default function ArenaRoomPage() {
   const [isLeaving, setIsLeaving] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const chestTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
   const channelRef = useRef<any>(null);
   const prevMembersCount = useRef<number>(0);
   const currentQIdxRef = useRef<number>(0);
+
+  const clearAllPendingTimeouts = () => {
+    pendingTimeoutsRef.current.forEach((t) => clearTimeout(t));
+    pendingTimeoutsRef.current = [];
+  };
 
   // ---------------------------------------------------------------------------
   // 1. Fetch Room Data
@@ -245,13 +253,21 @@ export default function ArenaRoomPage() {
   }, [roomCode, fetchRoomData]);
 
   // ---------------------------------------------------------------------------
-  // Auto-polling fallback in LOBBY (every 2.5s) to guarantee player updates
+  // Auto-polling fallback in LOBBY (every 2.5s) and PLAYING (every 1.5s)
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!room || room.status !== "LOBBY") return;
     const interval = setInterval(() => {
       fetchRoomData();
     }, 2500);
+    return () => clearInterval(interval);
+  }, [room?.status, fetchRoomData]);
+
+  useEffect(() => {
+    if (!room || room.status !== "PLAYING") return;
+    const interval = setInterval(() => {
+      fetchRoomData();
+    }, 1500);
     return () => clearInterval(interval);
   }, [room?.status, fetchRoomData]);
 
@@ -333,11 +349,15 @@ export default function ArenaRoomPage() {
   }, [soundEnabled]);
 
   const resetQuestionRound = () => {
+    clearAllPendingTimeouts();
+    if (chestTimerRef.current) clearInterval(chestTimerRef.current);
     setSelectedChoice(null);
     setAnswerResult(null);
     setShowChestModal(false);
     setChestOutcome(null);
     setShowRoundSummary(false);
+    setIsOpeningChest(false);
+    setIsAdvancingRound(false);
     startTimer();
   };
 
@@ -352,21 +372,22 @@ export default function ArenaRoomPage() {
           explanation: "หมดเวลาทำข้อสอบแล้ว! (ไม่ได้รับสิทธิ์เปิดกล่องสุ่ม)",
         });
 
-        // ส่งผลหมดเวลาไปยังเซิร์ฟเวอร์
+        // ส่งผลหมดเวลาไปยังเซิร์ฟเวอร์ (ระบุ timedOut: true และ choice: -1 เพื่อไม่ให้บังเอิญถูก)
         authFetch("/api/arena/action", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action: "answer",
             roomCode,
-            choice: 0,
+            choice: -1,
+            timedOut: true,
             timeRemaining: 0,
           }),
         }).then(async (res) => {
           if (res.ok) {
             const data = await res.json();
             if (data.autoAdvanced) {
-              setTimeout(() => {
+              const t = setTimeout(() => {
                 if (data.isFinished) {
                   channelRef.current?.send({ type: "broadcast", event: "GAME_OVER", payload: {} });
                   finishGame();
@@ -375,6 +396,7 @@ export default function ArenaRoomPage() {
                   fetchRoomData().then(() => resetQuestionRound());
                 }
               }, 1500);
+              pendingTimeoutsRef.current.push(t);
             }
           }
         });
@@ -382,7 +404,6 @@ export default function ArenaRoomPage() {
       return current;
     });
     setShowChestModal(false);
-    setTimeout(() => setShowRoundSummary(true), 1500);
   };
 
   // ---------------------------------------------------------------------------
@@ -413,6 +434,39 @@ export default function ArenaRoomPage() {
       setIsStartingGame(false);
     }
   };
+
+  // ---------------------------------------------------------------------------
+  // Auto-pick chest countdown (10s) to prevent waiting for AFK players
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!showChestModal || chestOutcome || isOpeningChest) {
+      if (chestTimerRef.current) clearInterval(chestTimerRef.current);
+      return;
+    }
+
+    setChestTimeLeft(10);
+    chestTimerRef.current = setInterval(() => {
+      setChestTimeLeft((prev) => {
+        if (prev <= 1) {
+          if (chestTimerRef.current) clearInterval(chestTimerRef.current);
+          // Auto-pick an available chest for the player
+          if (room?.members && !isOpeningChest) {
+            const availableChests = [1, 2, 3, 4, 5, 6].filter(
+              (n) => !room.members.some((m) => m.pickedChest === n)
+            );
+            const pickNum = availableChests[0] || 1;
+            handlePickChest(pickNum);
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (chestTimerRef.current) clearInterval(chestTimerRef.current);
+    };
+  }, [showChestModal, chestOutcome, isOpeningChest, room?.members]);
 
   // ---------------------------------------------------------------------------
   // 5. Action: Answer Question
@@ -446,12 +500,17 @@ export default function ArenaRoomPage() {
         if (data.isCorrect) {
           if (soundEnabled) gameSounds.playCorrect();
           // 🎁 เฉพาะคนที่ตอบถูกเท่านั้นที่ได้เปิดกล่องสุ่ม!
-          setTimeout(() => setShowChestModal(true), 800);
+          const t = setTimeout(() => setShowChestModal(true), 600);
+          pendingTimeoutsRef.current.push(t);
         } else {
           if (soundEnabled) gameSounds.playWrong();
-          // ❌ คนที่ตอบผิด ไม่ได้กล่องสุ่มเด็ดขาด
+          // ❌ คนที่ตอบผิด ไม่ได้กล่องสุ่ม
           setShowChestModal(false);
-          setTimeout(() => setShowRoundSummary(true), 2500);
+          // ถ้ายังไม่ออโต้แอดวานซ์ ค่อยเปิดหน้าสรุป
+          if (!data.autoAdvanced) {
+            const t = setTimeout(() => setShowRoundSummary(true), 1500);
+            pendingTimeoutsRef.current.push(t);
+          }
         }
 
         // Notify room members
@@ -463,7 +522,8 @@ export default function ArenaRoomPage() {
 
         // 🚀 ถ้าทุกคนตอบและเปิดกล่องครบแล้ว -> ข้ามไปข้อถัดไปทันทีอัตโนมัติ!
         if (data.autoAdvanced) {
-          setTimeout(() => {
+          clearAllPendingTimeouts();
+          const t = setTimeout(() => {
             if (data.isFinished) {
               channelRef.current?.send({
                 type: "broadcast",
@@ -479,7 +539,8 @@ export default function ArenaRoomPage() {
               });
               fetchRoomData().then(() => resetQuestionRound());
             }
-          }, 2000);
+          }, 1800);
+          pendingTimeoutsRef.current.push(t);
         }
       }
     } catch (e) {
@@ -493,6 +554,7 @@ export default function ArenaRoomPage() {
   const handlePickChest = async (chestIndex: number) => {
     if (isOpeningChest) return;
     setIsOpeningChest(true);
+    if (chestTimerRef.current) clearInterval(chestTimerRef.current);
 
     try {
       const res = await authFetch("/api/arena/action", {
@@ -532,16 +594,10 @@ export default function ArenaRoomPage() {
           payload: {},
         });
 
-        // After 2.5 seconds, close modal and show leaderboard summary
-        setTimeout(() => {
-          setShowChestModal(false);
-          setShowRoundSummary(true);
-          setIsOpeningChest(false);
-        }, 2500);
-
-        // 🚀 ถ้าทุกคนตอบและเลือกกล่องครบแล้ว -> ไปข้อถัดไปทันทีอัตโนมัติ!
+        // 🚀 ถ้าทุกคนตอบและเลือกกล่องครบแล้ว -> ไปข้อถัดไปทันทีอัตโนมัติ ไม่ต้องเปิดสรุปค้าง!
         if (data.autoAdvanced) {
-          setTimeout(() => {
+          clearAllPendingTimeouts();
+          const t = setTimeout(() => {
             if (data.isFinished) {
               channelRef.current?.send({
                 type: "broadcast",
@@ -557,7 +613,16 @@ export default function ArenaRoomPage() {
               });
               fetchRoomData().then(() => resetQuestionRound());
             }
-          }, 2300);
+          }, 2000);
+          pendingTimeoutsRef.current.push(t);
+        } else {
+          // ยังมีเพื่อนตอบหรือเปิดกล่องไม่เสร็จ ค่อยเปิด Summary แสดงสถานะ
+          const t = setTimeout(() => {
+            setShowChestModal(false);
+            setShowRoundSummary(true);
+            setIsOpeningChest(false);
+          }, 2200);
+          pendingTimeoutsRef.current.push(t);
         }
       } else {
         const err = await res.json();
@@ -1047,9 +1112,16 @@ export default function ArenaRoomPage() {
               <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight mb-1">
                 เลือกกล่องสุ่มชิงทอง (6 กล่อง)
               </h3>
-              <p className="text-xs text-amber-300 font-medium mb-6">
+              <p className="text-xs text-amber-300 font-medium mb-3">
                 ⚡ คนตอบถูกต้องก่อน มีสิทธิ์เลือกก่อน! (กล่องที่ถูกเปิดแล้วจะเลือกซ้ำไม่ได้)
               </p>
+
+              {!chestOutcome && (
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/30 px-3 py-1 rounded-full mb-5 animate-pulse">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>กรุณาเลือกใน {chestTimeLeft} วิ (สุ่มให้อัตโนมัติเมื่อหมดเวลา)</span>
+                </div>
+              )}
 
               {/* 6 Bouncing Golden Chests (First-come, first-served) */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 mb-6">
@@ -1206,26 +1278,46 @@ export default function ArenaRoomPage() {
                   ))}
               </div>
 
-              {isHost ? (
-                <button
-                  onClick={handleNextQuestion}
-                  disabled={isAdvancingRound}
-                  className="cursor-pointer w-full py-3 bg-[#BD1B0B] hover:bg-[#A81507] text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
-                >
-                  {isAdvancingRound ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <span>
-                      {room.currentQIdx + 1 >= room.totalQ
-                        ? "สรุปผลการประลอง 🏆"
-                        : "ลุยข้อต่อไป ➔"}
-                    </span>
+              {/* Dynamic Status / Host Fast-Forward */}
+              {room.members.every((m) => m.isAnswered && m.hasPickedChest) ? (
+                <div className="space-y-2">
+                  <div className="w-full py-3 px-3 rounded-xl bg-amber-500/10 border border-amber-400/40 text-amber-300 text-xs font-bold flex items-center justify-center gap-2 animate-pulse">
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                    <span>ทุกคนตอบครบแล้ว! กำลังเข้าสู่ข้อถัดไปอัตโนมัติ...</span>
+                  </div>
+                  {isHost && (
+                    <button
+                      onClick={handleNextQuestion}
+                      disabled={isAdvancingRound}
+                      className="cursor-pointer w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1.5"
+                    >
+                      {isAdvancingRound ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <span>ข้ามทันที (ไม่ต้องรอระบบ) ➔</span>
+                      )}
+                    </button>
                   )}
-                </button>
+                </div>
               ) : (
-                <p className="text-center text-xs text-slate-400 font-medium">
-                  รอหัวหน้าห้อง ({room.hostName}) กดลุยข้อถัดไป...
-                </p>
+                <div className="space-y-2">
+                  <p className="text-center text-xs text-slate-400 font-medium">
+                    กำลังรอผู้เล่นคนอื่นตอบคำถาม ({answeredCount}/{room.members.length} คน)...
+                  </p>
+                  {isHost && (
+                    <button
+                      onClick={handleNextQuestion}
+                      disabled={isAdvancingRound}
+                      className="cursor-pointer w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-2"
+                    >
+                      {isAdvancingRound ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <span>ข้ามข้อนี้ทันที (สำหรับหัวห้อง) ➔</span>
+                      )}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
