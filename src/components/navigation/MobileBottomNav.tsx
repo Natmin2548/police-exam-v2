@@ -22,7 +22,7 @@ export const MobileBottomNav = () => {
       isActive: pathname === "/archive",
     },
     {
-      label: "ประลอง",
+      label: "ประลองความรู้",
       href: "/arena",
       icon: Swords,
       isActive: pathname.startsWith("/arena"),

@@ -163,7 +163,7 @@ export default function ArenaLobbyPage() {
               <div className="flex items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
                   <Swords className="w-5 h-5 text-[#BD1B0B]" />
-                  สนามประลองชิงทอง 1-8 คน
+                  ประลองความรู้
                 </h1>
                 <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
                   PARTY QUIZ

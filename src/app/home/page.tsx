@@ -560,7 +560,7 @@ export default function HomePage() {
                 </div>
                 <h2 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2">
                   <Swords className="w-5 h-5 text-amber-200" />
-                  สนามประลอง 1-8 คน ชิงทองคำ
+                  ประลองความรู้
                 </h2>
                 <p className="text-xs text-white/90 font-medium">
                   ดวลตอบข้อสอบ ปล้นทองเพื่อน และสุ่มกล่องไอเทมสไตล์ Kahoot
