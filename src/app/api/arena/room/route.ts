@@ -15,8 +15,20 @@ export async function GET(request: NextRequest) {
     const roomCode = searchParams.get("roomCode");
     const mode = searchParams.get("mode");
 
-    // 1. ดึงรายการห้องสาธารณะสำหรับหน้าล็อบบี้
+    // 1. ดึงรายการห้องสาธารณะสำหรับหน้าล็อบบี้ (พร้อมล้างห้องว่างอัตโนมัติ)
     if (mode === "active_rooms") {
+      try {
+        await prisma.partyRoom.deleteMany({
+          where: {
+            OR: [
+              { members: { none: {} } },
+              { status: "FINISHED" },
+              { createdAt: { lt: new Date(Date.now() - 60 * 60 * 1000) } },
+            ],
+          },
+        });
+      } catch (e) {}
+
       const activeRooms = await prisma.partyRoom.findMany({
         where: {
           status: "LOBBY",
@@ -28,20 +40,22 @@ export async function GET(request: NextRequest) {
           },
         },
         orderBy: { createdAt: "desc" },
-        take: 10,
+        take: 12,
       });
 
       return NextResponse.json({
-        rooms: activeRooms.map((r) => ({
-          roomCode: r.roomCode,
-          title: r.title,
-          hostName: r.hostName,
-          category: r.category,
-          totalQ: r.totalQ,
-          memberCount: r.members.length,
-          maxMembers: 8,
-          createdAt: r.createdAt,
-        })),
+        rooms: activeRooms
+          .filter((r) => r.members.length > 0)
+          .map((r) => ({
+            roomCode: r.roomCode,
+            title: r.title,
+            hostName: r.hostName,
+            category: r.category,
+            totalQ: r.totalQ,
+            memberCount: r.members.length,
+            maxMembers: 8,
+            createdAt: r.createdAt,
+          })),
       });
     }
 
@@ -63,14 +77,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
 
+    // ถ้าห้องไม่มีสมาชิกหลงเหลืออยู่ ให้ลบห้องทิ้งทันที
+    if (room.members.length === 0) {
+      await prisma.partyRoom.delete({ where: { id: room.id } });
+      return NextResponse.json({ error: "ห้องนี้ถูกปิดแล้วเนื่องจากไม่มีผู้เล่น" }, { status: 404 });
+    }
+
     // Authenticate caller to identify current user and host status
     const email = await getEmailSafe(request);
     let currentDbUser = null;
     if (email) {
       currentDbUser = await prisma.user.findFirst({
         where: { email: { equals: email, mode: "insensitive" } },
-        select: { id: true, username: true, fullName: true },
+        select: { id: true, username: true, fullName: true, faceImage: true },
       });
+    }
+
+    // ✅ ถ้าผู้ใช้ล็อกอินเข้ามาดูห้อง LOBBY แล้วยังไม่ได้เป็นสมาชิก ให้เข้าร่วมห้องอัตโนมัติทันที
+    if (currentDbUser && room.status === "LOBBY") {
+      const isAlreadyMember = room.members.some((m) => m.userId === currentDbUser.id);
+      if (!isAlreadyMember && room.members.length < 8) {
+        const displayName = currentDbUser.fullName?.trim() || currentDbUser.username || `ผู้สอบ #${currentDbUser.id}`;
+        try {
+          const newMember = await prisma.partyMember.create({
+            data: {
+              roomId: room.id,
+              userId: currentDbUser.id,
+              username: displayName,
+              avatar: currentDbUser.faceImage || null,
+              gold: 0,
+              streak: 0,
+              isHost: false,
+            },
+          });
+          room.members.push(newMember);
+        } catch (e) {}
+      }
     }
 
     const currentUserId = currentDbUser?.id ?? null;
@@ -115,20 +157,35 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, roomCode, category = "รวมทุกวิชา", totalQ = 5, email: bodyEmail } = body;
+    const { action, roomCode, category = "รวมทุกวิชา", totalQ = 5, email: bodyEmail, userId: bodyUserId } = body;
 
     const email = await getEmailSafe(request, bodyEmail);
-    if (!email) {
-      return NextResponse.json({ error: "Unauthorized: Please log in" }, { status: 401 });
+    let user = null;
+    if (email) {
+      user = await prisma.user.findFirst({
+        where: { email: { equals: email, mode: "insensitive" } },
+        select: { id: true, username: true, fullName: true, faceImage: true },
+      });
+    } else if (bodyUserId) {
+      user = await prisma.user.findUnique({
+        where: { id: Number(bodyUserId) },
+        select: { id: true, username: true, fullName: true, faceImage: true },
+      });
     }
 
-    const user = await prisma.user.findFirst({
-      where: { email: { equals: email, mode: "insensitive" } },
-      select: { id: true, username: true, fullName: true, faceImage: true },
-    });
-
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      if (action === "leave" && roomCode) {
+        // If user cannot be resolved or session expired, check and delete room if empty
+        const room = await prisma.partyRoom.findUnique({
+          where: { roomCode },
+          include: { members: true },
+        });
+        if (room && room.members.length === 0) {
+          await prisma.partyRoom.delete({ where: { id: room.id } });
+        }
+        return NextResponse.json({ success: true, roomDeleted: true });
+      }
+      return NextResponse.json({ error: "Unauthorized: Please log in" }, { status: 401 });
     }
 
     const displayName = user.fullName?.trim() || user.username || `ผู้สอบ #${user.id}`;
@@ -390,20 +447,27 @@ export async function POST(request: NextRequest) {
         include: { members: true },
       });
 
-      if (!room) return NextResponse.json({ success: true });
+      if (!room) return NextResponse.json({ success: true, roomDeleted: true });
 
       // ลบตนเองออกจากห้อง
       await prisma.partyMember.deleteMany({
         where: { roomId: room.id, userId: user.id },
       });
 
-      const remaining = room.members.filter((m) => m.userId !== user.id);
+      // ดึงรายชื่อสมาชิกที่ยังเหลืออยู่ในห้องจริงๆ
+      const remaining = await prisma.partyMember.findMany({
+        where: { roomId: room.id },
+        orderBy: { joinedAt: "asc" },
+      });
 
       if (remaining.length === 0) {
-        // ห้องว่าง ลบทิ้ง
+        // ห้องว่าง ลบทิ้งทันที!
         await prisma.partyRoom.delete({ where: { id: room.id } });
-      } else if (room.hostId === user.id) {
-        // หัวหน้าออก โอนสิทธิ์หัวหน้าให้คนถัดไป
+        return NextResponse.json({ success: true, roomDeleted: true, remaining: 0 });
+      }
+
+      // ถ้าคนออกคือหัวหน้าห้อง และยังมีสมาชิกคนอื่นเหลืออยู่ -> โอนสิทธิ์หัวหน้าให้คนถัดไป
+      if (room.hostId === user.id) {
         const newHost = remaining[0];
         await prisma.partyRoom.update({
           where: { id: room.id },
@@ -415,7 +479,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, roomDeleted: false, remaining: remaining.length });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

@@ -38,6 +38,7 @@ interface Member {
   hasShield: boolean;
   isHost: boolean;
   isAnswered: boolean;
+  isCurrentMember?: boolean;
 }
 
 interface QuestionItem {
@@ -111,12 +112,14 @@ export default function ArenaRoomPage() {
   // Podium / Game over state
   const [podiumData, setPodiumData] = useState<any[] | null>(null);
 
-  // Action loaders
+  // Action loaders & state
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [isAdvancingRound, setIsAdvancingRound] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
+  const prevMembersCount = useRef<number>(0);
 
   // ---------------------------------------------------------------------------
   // 1. Fetch Room Data
@@ -129,6 +132,14 @@ export default function ArenaRoomPage() {
         setRoom(json.room);
         if (json.currentUserId) setCurrentUserId(json.currentUserId);
         if (typeof json.isHost === "boolean") setServerIsHost(json.isHost);
+
+        if (json.room?.members) {
+          if (prevMembersCount.current > 0 && json.room.members.length > prevMembersCount.current) {
+            if (soundEnabled) gameSounds.playTick();
+          }
+          prevMembersCount.current = json.room.members.length;
+        }
+
         return json.room;
       } else {
         const errJson = await res.json();
@@ -140,7 +151,7 @@ export default function ArenaRoomPage() {
       setLoading(false);
     }
     return null;
-  }, [roomCode]);
+  }, [roomCode, soundEnabled]);
 
   // ---------------------------------------------------------------------------
   // 2. Setup User & Supabase Realtime Channel
@@ -186,7 +197,16 @@ export default function ArenaRoomPage() {
         .on("broadcast", { event: "GAME_OVER" }, () => {
           finishGame();
         })
-        .subscribe();
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            // ✅ Notify all other players in the room immediately
+            channel.send({
+              type: "broadcast",
+              event: "REFRESH_ROOM",
+              payload: { event: "MEMBER_JOINED" },
+            });
+          }
+        });
 
       activeChannel = channel;
       channelRef.current = channel;
@@ -201,6 +221,72 @@ export default function ArenaRoomPage() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [roomCode, fetchRoomData]);
+
+  // ---------------------------------------------------------------------------
+  // Auto-polling fallback in LOBBY (every 2.5s) to guarantee player updates
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!room || room.status !== "LOBBY") return;
+    const interval = setInterval(() => {
+      fetchRoomData();
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [room?.status, fetchRoomData]);
+
+  // ---------------------------------------------------------------------------
+  // Action: Leave Room (Deletes room if empty or transfers host)
+  // ---------------------------------------------------------------------------
+  const handleLeaveRoom = useCallback(
+    async (destination = "/arena") => {
+      if (isLeaving) return;
+      setIsLeaving(true);
+
+      try {
+        // Broadcast leave event immediately
+        channelRef.current?.send({
+          type: "broadcast",
+          event: "REFRESH_ROOM",
+          payload: { event: "MEMBER_LEFT", userId: currentUserId },
+        });
+
+        await authFetch("/api/arena/room", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "leave",
+            roomCode,
+            userId: currentUserId,
+            email: currentUser?.email,
+          }),
+        });
+      } catch (e) {
+        console.error("Error leaving room:", e);
+      } finally {
+        router.push(destination);
+      }
+    },
+    [isLeaving, roomCode, currentUserId, currentUser?.email, router]
+  );
+
+  // Send leave signal on tab close or browser navigation
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!roomCode) return;
+      const payload = JSON.stringify({
+        action: "leave",
+        roomCode,
+        userId: currentUserId,
+        email: currentUser?.email,
+      });
+      const blob = new Blob([payload], { type: "application/json" });
+      navigator.sendBeacon("/api/arena/room", blob);
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [roomCode, currentUserId, currentUser?.email]);
 
   // ---------------------------------------------------------------------------
   // 3. Round Countdown Timer
@@ -513,12 +599,18 @@ export default function ArenaRoomPage() {
       <div className="min-h-screen bg-[#0F172A] text-white flex flex-col justify-between p-4 sm:p-8">
         {/* Top bar */}
         <div className="max-w-4xl mx-auto w-full flex items-center justify-between">
-          <Link
-            href="/arena"
-            className="w-10 h-10 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+          <button
+            onClick={() => handleLeaveRoom("/arena")}
+            disabled={isLeaving}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-red-500/50 transition-colors cursor-pointer text-xs font-bold shadow-sm"
           >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
+            {isLeaving ? (
+              <Loader2 className="w-4 h-4 animate-spin text-red-400" />
+            ) : (
+              <ArrowLeft className="w-4 h-4" />
+            )}
+            <span>ออกจากห้อง</span>
+          </button>
 
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
@@ -579,27 +671,52 @@ export default function ArenaRoomPage() {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            {room.members.map((member) => (
-              <div
-                key={member.id}
-                className="bg-slate-800/80 border border-slate-700 rounded-2xl p-3 flex items-center gap-2.5 shadow-sm relative overflow-hidden"
-              >
-                {member.isHost && (
-                  <Crown className="w-4 h-4 text-amber-400 absolute top-2 right-2" />
-                )}
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center font-black text-white text-xs shrink-0 shadow-xs">
-                  {member.username.slice(0, 1)}
+            {Array.from({ length: 8 }).map((_, idx) => {
+              const member = room.members[idx];
+              if (member) {
+                const isMe = currentUserId ? member.userId === currentUserId : member.isCurrentMember;
+                return (
+                  <div
+                    key={member.id}
+                    className={`bg-slate-800/90 border rounded-2xl p-3 flex items-center gap-2.5 shadow-sm relative overflow-hidden transition-all ${
+                      isMe ? "border-amber-400/80 shadow-amber-500/10 shadow-md ring-1 ring-amber-400/30" : "border-slate-700"
+                    }`}
+                  >
+                    {member.isHost && (
+                      <Crown className="w-4 h-4 text-amber-400 absolute top-2 right-2 animate-bounce" />
+                    )}
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 flex items-center justify-center font-black text-white text-xs shrink-0 shadow-xs">
+                      {member.username.slice(0, 1)}
+                    </div>
+                    <div className="overflow-hidden">
+                      <div className="flex items-center gap-1">
+                        <h4 className="text-xs font-bold text-slate-200 truncate">
+                          {member.username}
+                        </h4>
+                        {isMe && (
+                          <span className="text-[9px] font-black text-amber-300 bg-amber-500/20 px-1 py-0.2 rounded">
+                            คุณ
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400 block">
+                        {member.isHost ? "หัวหน้าห้อง" : "ผู้ท้าชิง"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={`slot-${idx}`}
+                  className="border-2 border-dashed border-slate-700/60 rounded-2xl p-3 flex items-center justify-center gap-2 text-slate-500 text-xs font-bold bg-slate-900/40 min-h-[58px]"
+                >
+                  <Users className="w-3.5 h-3.5 opacity-40" />
+                  <span>ว่าง (#{idx + 1})</span>
                 </div>
-                <div className="overflow-hidden">
-                  <h4 className="text-xs font-bold text-slate-200 truncate">
-                    {member.username}
-                  </h4>
-                  <span className="text-[10px] text-slate-400 block">
-                    {member.isHost ? "หัวหน้าห้อง" : "ผู้ท้าชิง"}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Bottom Action */}
@@ -651,6 +768,18 @@ export default function ArenaRoomPage() {
         <div className="max-w-4xl mx-auto w-full">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (confirm("ต้องการออกจากห้องประลองหรือไม่?")) {
+                    handleLeaveRoom("/arena");
+                  }
+                }}
+                disabled={isLeaving}
+                className="p-1.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-400 hover:text-red-400 hover:border-red-500/50 transition-colors cursor-pointer"
+                title="ออกจากห้องประลอง"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
               <span className="text-xs font-black px-3 py-1 rounded-xl bg-slate-800 border border-slate-700 text-slate-300">
                 ข้อ {room.currentQIdx + 1}/{room.totalQ}
               </span>
@@ -957,18 +1086,22 @@ export default function ArenaRoomPage() {
 
         {/* Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
-          <Link
-            href="/arena"
-            className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl text-xs font-black border border-slate-700 transition-all text-center"
+          <button
+            onClick={() => handleLeaveRoom("/arena")}
+            disabled={isLeaving}
+            className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl text-xs font-black border border-slate-700 transition-all text-center cursor-pointer flex items-center justify-center gap-2"
           >
-            กลับหน้าล็อบบี้
-          </Link>
-          <Link
-            href="/home"
-            className="w-full py-3.5 bg-[#BD1B0B] hover:bg-[#A81507] text-white rounded-2xl text-xs font-black shadow-lg shadow-red-600/20 transition-all text-center"
+            {isLeaving ? <Loader2 className="w-4 h-4 animate-spin text-amber-400" /> : null}
+            <span>กลับหน้าล็อบบี้</span>
+          </button>
+          <button
+            onClick={() => handleLeaveRoom("/home")}
+            disabled={isLeaving}
+            className="w-full py-3.5 bg-[#BD1B0B] hover:bg-[#A81507] text-white rounded-2xl text-xs font-black shadow-lg shadow-red-600/20 transition-all text-center cursor-pointer flex items-center justify-center gap-2"
           >
-            หน้าหลัก
-          </Link>
+            {isLeaving ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : null}
+            <span>หน้าหลัก</span>
+          </button>
         </div>
       </div>
     );
