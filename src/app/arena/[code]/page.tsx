@@ -39,6 +39,8 @@ interface Member {
   isHost: boolean;
   isAnswered: boolean;
   isCurrentMember?: boolean;
+  hasPickedChest?: boolean;
+  pickedChest?: number | null;
 }
 
 interface QuestionItem {
@@ -557,6 +559,11 @@ export default function ArenaRoomPage() {
             }
           }, 2300);
         }
+      } else {
+        const err = await res.json();
+        alert(err.error || "ไม่สามารถเปิดกล่องนี้ได้");
+        await fetchRoomData();
+        setIsOpeningChest(false);
       }
     } catch (e) {
       console.error("Chest pick error:", e);
@@ -1037,30 +1044,77 @@ export default function ArenaRoomPage() {
                 <span>ตอบถูกต้อง! +{answerResult?.gainedGold}G</span>
               </span>
 
-              <h3 className="text-2xl font-black text-white tracking-tight mb-2">
-                เลือกกล่องสุ่มชิงทอง 1 กล่อง!
+              <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight mb-1">
+                เลือกกล่องสุ่มชิงทอง (6 กล่อง)
               </h3>
-              <p className="text-xs text-slate-300 font-medium mb-8">
-                ลุ้นรับทองคำโบนัส, ปล้นทองเพื่อน หรือโล่ป้องกัน
+              <p className="text-xs text-amber-300 font-medium mb-6">
+                ⚡ คนตอบถูกต้องก่อน มีสิทธิ์เลือกก่อน! (กล่องที่ถูกเปิดแล้วจะเลือกซ้ำไม่ได้)
               </p>
 
-              {/* 3 Bouncing Golden Chests */}
-              <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6">
-                {[1, 2, 3].map((chestNum) => (
-                  <button
-                    key={chestNum}
-                    onClick={() => handlePickChest(chestNum)}
-                    disabled={isOpeningChest}
-                    className="cursor-pointer group relative bg-gradient-to-b from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 border-2 border-amber-300 rounded-3xl p-5 shadow-2xl active:scale-95 transition-all flex flex-col items-center justify-center min-h-[130px]"
-                  >
-                    <div className="text-3xl sm:text-4xl mb-2 group-hover:scale-110 transition-transform">
-                      🎁
-                    </div>
-                    <span className="text-[11px] font-black text-slate-950 uppercase tracking-wider">
-                      กล่องที่ {chestNum}
-                    </span>
-                  </button>
-                ))}
+              {/* 6 Bouncing Golden Chests (First-come, first-served) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 mb-6">
+                {[1, 2, 3, 4, 5, 6].map((chestNum) => {
+                  const takenMember = room.members.find((m) => m.pickedChest === chestNum);
+                  const isTakenByMe = currentMember?.pickedChest === chestNum;
+                  const isTakenByOther = Boolean(takenMember && !isTakenByMe);
+
+                  if (isTakenByOther) {
+                    return (
+                      <div
+                        key={chestNum}
+                        className="bg-slate-900/90 border-2 border-slate-700/80 rounded-2xl p-3 flex flex-col items-center justify-center min-h-[110px] opacity-70 relative select-none"
+                      >
+                        <div className="text-2xl sm:text-3xl mb-1 filter grayscale">
+                          📦
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400 line-through mb-1">
+                          กล่องที่ {chestNum}
+                        </span>
+                        <span className="text-[9px] font-black text-red-400 bg-red-950/80 border border-red-500/40 px-1.5 py-0.5 rounded-md truncate max-w-[100px]">
+                          🔒 {takenMember?.username}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  if (isTakenByMe) {
+                    return (
+                      <div
+                        key={chestNum}
+                        className="bg-gradient-to-b from-amber-500 to-amber-700 border-2 border-amber-300 ring-2 ring-amber-400/50 rounded-2xl p-3 flex flex-col items-center justify-center min-h-[110px] shadow-xl relative"
+                      >
+                        <div className="text-3xl mb-1 animate-bounce">
+                          ✨
+                        </div>
+                        <span className="text-[11px] font-black text-slate-950 uppercase tracking-wider mb-1">
+                          กล่องที่ {chestNum}
+                        </span>
+                        <span className="text-[9px] font-black text-amber-950 bg-amber-300 px-2 py-0.5 rounded-full">
+                          คุณเปิดกล่องนี้
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={chestNum}
+                      onClick={() => handlePickChest(chestNum)}
+                      disabled={isOpeningChest || Boolean(currentMember?.pickedChest)}
+                      className="cursor-pointer group relative bg-gradient-to-b from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 border-2 border-amber-300 rounded-2xl p-3 shadow-xl active:scale-95 transition-all flex flex-col items-center justify-center min-h-[110px]"
+                    >
+                      <div className="text-3xl mb-1 group-hover:scale-110 transition-transform">
+                        🎁
+                      </div>
+                      <span className="text-[11px] font-black text-slate-950 uppercase tracking-wider">
+                        กล่องที่ {chestNum}
+                      </span>
+                      <span className="text-[9px] font-bold text-amber-950/80 mt-0.5">
+                        ว่าง • คลิกเลือก
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Chest Outcome Reveal */}

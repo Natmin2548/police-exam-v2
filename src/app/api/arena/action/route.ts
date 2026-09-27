@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
           isAnswered: false,
           lastAnswerChoice: null,
           hasPickedChest: false,
+          pickedChest: null,
         },
       });
 
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
-    // Action 2: OPEN_CHEST (เปิดกล่องสุ่มปริศนาชิงทอง - เฉพาะคนที่ตอบถูก)
+    // Action 2: OPEN_CHEST (เปิดกล่องสุ่ม 6 กล่อง - คนตอบก่อนได้เลือกก่อน!)
     // -------------------------------------------------------------------------
     if (action === "open_chest") {
       // 🔒 ตรวจสอบว่าต้องตอบข้อปัจจุบันถูกเท่านั้นถึงจะเปิดกล่องได้!
@@ -163,6 +164,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           error: "เฉพาะคนที่ตอบถูกต้องเท่านั้นที่มีสิทธิ์เปิดกล่องสุ่มชิงทอง!",
         }, { status: 403 });
+      }
+
+      const chosenNum = Number(chestIndex);
+      if (isNaN(chosenNum) || chosenNum < 1 || chosenNum > 6) {
+        return NextResponse.json({ error: "กรุณาเลือกกล่องหมายเลข 1 ถึง 6" }, { status: 400 });
+      }
+
+      // ตรวจสอบว่าตนเองเคยเปิดกล่องไปแล้วหรือยัง
+      if (currentMember.hasPickedChest && currentMember.pickedChest !== null) {
+        return NextResponse.json({ error: "คุณได้เปิดกล่องสุ่มในรอบนี้ไปแล้ว" }, { status: 400 });
+      }
+
+      // 🏁 กฎคนตอบก่อนได้เลือกก่อน: ตรวจสอบว่ากล่องนี้มีเพื่อนในห้องเปิดไปแล้วหรือยัง
+      const takenBy = room.members.find((m) => m.pickedChest === chosenNum && m.userId !== user.id);
+      if (takenBy) {
+        return NextResponse.json({
+          error: `กล่องที่ ${chosenNum} ถูกเปิดไปแล้วโดย ${takenBy.username}! กรุณาเลือกกล่องอื่นที่ยังว่าง`,
+          alreadyTaken: true,
+          takenBy: takenBy.username,
+        }, { status: 400 });
       }
 
       // สุ่มผลลัพธ์ของกล่อง
@@ -263,10 +284,10 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // บันทึกว่าผู้เล่นได้เลือกเปิดกล่องสุ่มแล้ว
+      // บันทึกว่าผู้เล่นได้เลือกเปิดกล่องสุ่มหมายเลขนี้แล้ว
       await prisma.partyMember.update({
         where: { id: currentMember.id },
-        data: { hasPickedChest: true },
+        data: { hasPickedChest: true, pickedChest: chosenNum },
       });
 
       // ดึงคะแนนทองล่าสุด
@@ -307,6 +328,7 @@ export async function POST(request: NextRequest) {
           isAnswered: false,
           lastAnswerChoice: null,
           hasPickedChest: false,
+          pickedChest: null,
         },
       });
 

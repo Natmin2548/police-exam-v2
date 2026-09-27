@@ -444,6 +444,7 @@ model PartyMember {
   isAnswered       Boolean    @default(false)
   lastAnswerChoice Int?
   hasPickedChest   Boolean    @default(false)
+  pickedChest      Int?
   joinedAt         DateTime   @default(now())
   room             PartyRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
