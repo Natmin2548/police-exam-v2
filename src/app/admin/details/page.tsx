@@ -77,10 +77,13 @@ export default function AdminDetailsPage() {
 
       const res = await fetch(`/api/admin/overview?email=${encodeURIComponent(session.user.email)}`);
       if (res.status === 403) {
-        router.replace("/home");
+        setError(`บัญชี (${session.user.email}) ยังไม่ได้รับสิทธิ์ผู้ดูแลระบบ (Role ในระบบไม่ใช่ ADMIN)`);
         return;
       }
-      if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลได้");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}: ไม่สามารถโหลดข้อมูลได้`);
+      }
 
       const d = await res.json();
       setData({

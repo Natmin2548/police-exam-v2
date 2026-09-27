@@ -87,18 +87,27 @@ export default function AdminOverviewPage() {
     setError("");
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.email) { router.replace("/home"); return; }
+      if (!session?.user?.email) {
+        setError("ยังไม่ได้เข้าสู่ระบบ กรุณาเข้าสู่ระบบก่อนเข้าใช้งาน");
+        return;
+      }
       setUserEmail(session.user.email);
 
       const res = await fetch(`/api/admin/overview?email=${encodeURIComponent(session.user.email)}`);
-      if (res.status === 403) { router.replace("/home"); return; }
-      if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลได้");
+      if (res.status === 403) {
+        setError(`บัญชี (${session.user.email}) ยังไม่ได้รับสิทธิ์ผู้ดูแลระบบ (Role ในระบบไม่ใช่ ADMIN)`);
+        return;
+      }
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `HTTP ${res.status}: ไม่สามารถโหลดข้อมูลได้`);
+      }
 
       const d = await res.json();
       setData(d);
       setLastUpdated(new Date());
     } catch (err: any) {
-      setError(err.message || "เกิดข้อผิดพลาด");
+      setError(err.message || "เกิดข้อผิดพลาดในการโหลดข้อมูล");
     } finally {
       setLoading(false);
     }
@@ -119,9 +128,26 @@ export default function AdminOverviewPage() {
     return (
       <div className="min-h-screen bg-[#FBFBFB] flex flex-col items-center justify-center p-4 text-center">
         <AlertTriangle className="w-12 h-12 text-amber-500 mb-3" />
-        <h2 className="text-base font-black text-slate-900 mb-1">{error || "ไม่มีสิทธิ์เข้าถึง"}</h2>
-        <p className="text-xs text-slate-500 mb-5">หน้านี้สำหรับผู้ดูแลระบบเท่านั้น</p>
-        <Link href="/home" className="py-2.5 px-6 bg-[#BD1B0B] text-white text-xs font-black rounded-xl">กลับสู่หน้าหลัก</Link>
+        <h2 className="text-base font-black text-slate-900 mb-1">
+          {error || "ไม่มีสิทธิ์เข้าถึง"}
+        </h2>
+        {userEmail && (
+          <p className="text-xs text-slate-600 font-bold mb-1">
+            บัญชีที่ล็อกอินอยู่: <span className="text-[#BD1B0B]">{userEmail}</span>
+          </p>
+        )}
+        <p className="text-xs text-slate-500 mb-5">หน้านี้สำหรับผู้ดูแลระบบ (ADMIN) เท่านั้น</p>
+        <div className="flex items-center gap-2 justify-center">
+          <button
+            onClick={() => fetchData()}
+            className="py-2.5 px-5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-black rounded-xl cursor-pointer shadow-xs"
+          >
+            ลองใหม่ 🔄
+          </button>
+          <Link href="/home" className="py-2.5 px-6 bg-[#BD1B0B] hover:bg-[#A81507] text-white text-xs font-black rounded-xl shadow-xs">
+            กลับสู่หน้าหลัก
+          </Link>
+        </div>
       </div>
     );
   }
