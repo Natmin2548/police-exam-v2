@@ -408,3 +408,46 @@ model UserMissionProgress {
   @@index([userId, missionDate])
 }
 
+// -----------------------------------------------------------------------------
+// ระบบปาร์ตี้ดวลตอบคำถามชิงทอง (Party Quiz Arena 1-8 คน)
+// -----------------------------------------------------------------------------
+model PartyRoom {
+  id           String        @id @default(cuid())
+  roomCode     String        @unique // PIN 6 หลัก เช่น "482109"
+  title        String        @default("ห้องประลองความรู้ตำรวจ")
+  hostId       Int
+  hostName     String        @default("หัวหน้าห้อง")
+  status       String        @default("LOBBY") // LOBBY, PLAYING, FINISHED
+  category     String        @default("รวมทุกวิชา")
+  totalQ       Int           @default(5)
+  isPublic     Boolean       @default(true)
+  currentQIdx  Int           @default(0)
+  questions    Json
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  members      PartyMember[]
+
+  @@index([status, isPublic])
+  @@index([roomCode])
+}
+
+model PartyMember {
+  id               Int        @id @default(autoincrement())
+  roomId           String
+  userId           Int
+  username         String
+  avatar           String?
+  gold             Int        @default(0)
+  streak           Int        @default(0)
+  hasShield        Boolean    @default(false)
+  isHost           Boolean    @default(false)
+  isAnswered       Boolean    @default(false)
+  lastAnswerChoice Int?
+  joinedAt         DateTime   @default(now())
+  room             PartyRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+}
+
+

@@ -19,6 +19,7 @@ import {
   Calendar,
   Sparkles,
   Flame,
+  Swords,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
@@ -544,6 +545,30 @@ export default function HomePage() {
 
               <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white group-hover:text-[#BD1B0B] transition-colors shrink-0">
                 <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+            </Link>
+
+            {/* Banner: Arena 1-8 คน ชิงทองคำ สไตล์ Kahoot */}
+            <Link
+              href="/arena"
+              className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-500 via-orange-500 to-[#BD1B0B] text-white p-5 sm:p-6 shadow-md shadow-orange-600/15 flex items-center justify-between cursor-pointer hover:shadow-lg transition-all group block"
+            >
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-white/20 text-white backdrop-blur-xs">
+                  <Flame className="w-3 h-3 fill-amber-200 text-amber-200" />
+                  <span>โหมดใหม่ PARTY QUIZ</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2">
+                  <Swords className="w-5 h-5 text-amber-200" />
+                  สนามประลอง 1-8 คน ชิงทองคำ
+                </h2>
+                <p className="text-xs text-white/90 font-medium">
+                  ดวลตอบข้อสอบ ปล้นทองเพื่อน และสุ่มกล่องไอเทมสไตล์ Kahoot
+                </p>
+              </div>
+
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center group-hover:bg-white group-hover:text-orange-600 transition-colors shrink-0">
+                <ChevronRight className="w-5 h-5" />
               </div>
             </Link>
 
