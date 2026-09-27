@@ -129,6 +129,7 @@ export default function ArenaRoomPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<any>(null);
   const prevMembersCount = useRef<number>(0);
+  const currentQIdxRef = useRef<number>(0);
 
   // ---------------------------------------------------------------------------
   // 1. Fetch Room Data
@@ -147,6 +148,16 @@ export default function ArenaRoomPage() {
             if (soundEnabled) gameSounds.playTick();
           }
           prevMembersCount.current = json.room.members.length;
+        }
+
+        // Auto-advance client if server moved to a new question index
+        if (
+          json.room &&
+          json.room.status === "PLAYING" &&
+          json.room.currentQIdx !== currentQIdxRef.current
+        ) {
+          currentQIdxRef.current = json.room.currentQIdx;
+          resetQuestionRound();
         }
 
         return json.room;
@@ -338,6 +349,33 @@ export default function ArenaRoomPage() {
           gainedGold: 0,
           explanation: "หมดเวลาทำข้อสอบแล้ว! (ไม่ได้รับสิทธิ์เปิดกล่องสุ่ม)",
         });
+
+        // ส่งผลหมดเวลาไปยังเซิร์ฟเวอร์
+        authFetch("/api/arena/action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "answer",
+            roomCode,
+            choice: 0,
+            timeRemaining: 0,
+          }),
+        }).then(async (res) => {
+          if (res.ok) {
+            const data = await res.json();
+            if (data.autoAdvanced) {
+              setTimeout(() => {
+                if (data.isFinished) {
+                  channelRef.current?.send({ type: "broadcast", event: "GAME_OVER", payload: {} });
+                  finishGame();
+                } else {
+                  channelRef.current?.send({ type: "broadcast", event: "NEXT_QUESTION", payload: {} });
+                  fetchRoomData().then(() => resetQuestionRound());
+                }
+              }, 1500);
+            }
+          }
+        });
       }
       return current;
     });
@@ -420,6 +458,27 @@ export default function ArenaRoomPage() {
           event: "REFRESH_ROOM",
           payload: {},
         });
+
+        // 🚀 ถ้าทุกคนตอบและเปิดกล่องครบแล้ว -> ข้ามไปข้อถัดไปทันทีอัตโนมัติ!
+        if (data.autoAdvanced) {
+          setTimeout(() => {
+            if (data.isFinished) {
+              channelRef.current?.send({
+                type: "broadcast",
+                event: "GAME_OVER",
+                payload: {},
+              });
+              finishGame();
+            } else {
+              channelRef.current?.send({
+                type: "broadcast",
+                event: "NEXT_QUESTION",
+                payload: {},
+              });
+              fetchRoomData().then(() => resetQuestionRound());
+            }
+          }, 2000);
+        }
       }
     } catch (e) {
       console.error("Answer submit error:", e);
@@ -477,6 +536,27 @@ export default function ArenaRoomPage() {
           setShowRoundSummary(true);
           setIsOpeningChest(false);
         }, 2500);
+
+        // 🚀 ถ้าทุกคนตอบและเลือกกล่องครบแล้ว -> ไปข้อถัดไปทันทีอัตโนมัติ!
+        if (data.autoAdvanced) {
+          setTimeout(() => {
+            if (data.isFinished) {
+              channelRef.current?.send({
+                type: "broadcast",
+                event: "GAME_OVER",
+                payload: {},
+              });
+              finishGame();
+            } else {
+              channelRef.current?.send({
+                type: "broadcast",
+                event: "NEXT_QUESTION",
+                payload: {},
+              });
+              fetchRoomData().then(() => resetQuestionRound());
+            }
+          }, 2300);
+        }
       }
     } catch (e) {
       console.error("Chest pick error:", e);
@@ -922,12 +1002,20 @@ export default function ArenaRoomPage() {
             </strong>
           </span>
 
-          {/* Host Next button if everyone answered or time out */}
+          {/* Auto-advance indicator */}
+          {answeredCount === room.members.length && (
+            <div className="flex items-center gap-1.5 text-[11px] text-amber-300 bg-amber-500/10 border border-amber-400/30 px-3 py-1 rounded-xl animate-pulse">
+              <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
+              <span>ตอบครบแล้ว รอเปิดกล่องเสร็จจะไปข้อต่อไปอัตโนมัติ...</span>
+            </div>
+          )}
+
+          {/* Host Next button (เป็นปุ่มสำรองกรณีกดข้ามก่อนหมดเวลา) */}
           {(showRoundSummary || answeredCount === room.members.length) && isHost && (
             <button
               onClick={handleNextQuestion}
               disabled={isAdvancingRound}
-              className="cursor-pointer px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black shadow-md flex items-center gap-1.5 transition-all animate-bounce-subtle"
+              className="cursor-pointer px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black shadow-md flex items-center gap-1.5 transition-all"
             >
               {isAdvancingRound ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />

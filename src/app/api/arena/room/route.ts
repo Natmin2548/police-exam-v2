@@ -425,6 +425,7 @@ export async function POST(request: NextRequest) {
           isAnswered: false,
           lastAnswerChoice: null,
           hasShield: false,
+          hasPickedChest: false,
         },
       });
 

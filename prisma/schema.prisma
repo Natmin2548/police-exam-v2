@@ -443,6 +443,7 @@ model PartyMember {
   isHost           Boolean    @default(false)
   isAnswered       Boolean    @default(false)
   lastAnswerChoice Int?
+  hasPickedChest   Boolean    @default(false)
   joinedAt         DateTime   @default(now())
   room             PartyRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
 

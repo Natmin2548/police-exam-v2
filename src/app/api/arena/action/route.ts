@@ -40,6 +40,40 @@ export async function POST(request: NextRequest) {
     const rawQuestions = Array.isArray(room.questions) ? room.questions : [];
     const currentQ = rawQuestions[room.currentQIdx] as any;
 
+    // Helper: ตรวจสอบว่าทุกคนตอบครบและเลือกกล่องครบแล้วหรือยัง ถ้าครบแล้วให้เลื่อนไปข้อถัดไปทันที
+    const checkAutoAdvance = async () => {
+      const allMembers = await prisma.partyMember.findMany({
+        where: { roomId: room.id },
+      });
+      if (allMembers.length === 0) return { autoAdvanced: false, isFinished: false, nextIdx: room.currentQIdx };
+
+      // ทุกคนต้องตอบแล้ว (isAnswered === true) และถ้าต้องเลือกกล่องก็ต้องเลือกแล้ว (hasPickedChest === true)
+      const isEveryoneReady = allMembers.every((m) => m.isAnswered && m.hasPickedChest);
+      if (!isEveryoneReady) return { autoAdvanced: false, isFinished: false, nextIdx: room.currentQIdx };
+
+      const nextIdx = room.currentQIdx + 1;
+      const isFinished = nextIdx >= room.totalQ;
+
+      await prisma.partyMember.updateMany({
+        where: { roomId: room.id },
+        data: {
+          isAnswered: false,
+          lastAnswerChoice: null,
+          hasPickedChest: false,
+        },
+      });
+
+      await prisma.partyRoom.update({
+        where: { id: room.id },
+        data: {
+          currentQIdx: nextIdx,
+          status: isFinished ? "FINISHED" : "PLAYING",
+        },
+      });
+
+      return { autoAdvanced: true, isFinished, nextIdx };
+    };
+
     // -------------------------------------------------------------------------
     // Action 1: ANSWER (ตอบคำถาม)
     // -------------------------------------------------------------------------
@@ -65,8 +99,11 @@ export async function POST(request: NextRequest) {
             streak: nextStreak,
             isAnswered: true,
             lastAnswerChoice: Number(choice),
+            hasPickedChest: false, // ตอบถูก ต้องเลือกกล่องก่อนถึงจะถือว่าเสร็จสิ้น
           },
         });
+
+        const advanceStatus = await checkAutoAdvance();
 
         return NextResponse.json({
           success: true,
@@ -77,6 +114,9 @@ export async function POST(request: NextRequest) {
           correctAnswer: currentQ.correctAnswer,
           explanation: currentQ.explanation,
           canPickChest: true,
+          autoAdvanced: advanceStatus.autoAdvanced,
+          isFinished: advanceStatus.isFinished,
+          nextQIdx: advanceStatus.nextIdx,
         });
       } else {
         await prisma.partyMember.update({
@@ -85,8 +125,11 @@ export async function POST(request: NextRequest) {
             streak: 0,
             isAnswered: true,
             lastAnswerChoice: Number(choice),
+            hasPickedChest: true, // คนตอบผิดไม่ได้กล่อง ถือว่า action รอบนี้เสร็จสิ้นทันที
           },
         });
+
+        const advanceStatus = await checkAutoAdvance();
 
         return NextResponse.json({
           success: true,
@@ -97,6 +140,9 @@ export async function POST(request: NextRequest) {
           correctAnswer: currentQ.correctAnswer,
           explanation: currentQ.explanation,
           canPickChest: false,
+          autoAdvanced: advanceStatus.autoAdvanced,
+          isFinished: advanceStatus.isFinished,
+          nextQIdx: advanceStatus.nextIdx,
         });
       }
     }
@@ -217,11 +263,20 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // บันทึกว่าผู้เล่นได้เลือกเปิดกล่องสุ่มแล้ว
+      await prisma.partyMember.update({
+        where: { id: currentMember.id },
+        data: { hasPickedChest: true },
+      });
+
       // ดึงคะแนนทองล่าสุด
       const updatedSelf = await prisma.partyMember.findUnique({
         where: { id: currentMember.id },
         select: { gold: true, hasShield: true },
       });
+
+      // ตรวจสอบว่าทุกคนเปิดกล่องครบแล้วหรือยัง ถ้าครบแล้วข้ามข้อทันที!
+      const advanceStatus = await checkAutoAdvance();
 
       return NextResponse.json({
         success: true,
@@ -233,6 +288,9 @@ export async function POST(request: NextRequest) {
         isBlockedByShield,
         myNewGold: updatedSelf?.gold ?? currentMember.gold,
         hasShield: updatedSelf?.hasShield ?? false,
+        autoAdvanced: advanceStatus.autoAdvanced,
+        isFinished: advanceStatus.isFinished,
+        nextQIdx: advanceStatus.nextIdx,
       });
     }
 
@@ -248,6 +306,7 @@ export async function POST(request: NextRequest) {
         data: {
           isAnswered: false,
           lastAnswerChoice: null,
+          hasPickedChest: false,
         },
       });
 
