@@ -39,6 +39,14 @@ export async function GET(req: NextRequest) {
       prisma.examKnowledgeBank.count(),
     ]);
 
+    // Auto-process any pending reports asynchronously in background so admin never needs to click
+    const pendingToAutoAudit = reports.filter((r) => r.status === "PENDING").slice(0, 5);
+    if (pendingToAutoAudit.length > 0) {
+      Promise.allSettled(pendingToAutoAudit.map((r) => auditReportedQuestion(r.id))).catch((err) => {
+        console.warn("[Auto-Audit Background] Error:", err.message);
+      });
+    }
+
     return NextResponse.json({
       success: true,
       reports,
@@ -53,7 +61,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/admin/reports -> Trigger AI Re-audit or 1-Click Rollback
+// POST /api/admin/reports -> Trigger AI Re-audit, Batch Audit, or 1-Click Rollback
 export async function POST(req: NextRequest) {
   try {
     const { action, reportId, email } = await req.json();
@@ -61,6 +69,31 @@ export async function POST(req: NextRequest) {
     const admin = await verifyAdmin(email);
     if (!admin) {
       return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
+    }
+
+    // 0. Action: Batch Audit All Pending
+    if (action === "audit_all_pending") {
+      const pendingList = await prisma.reportedQuestion.findMany({
+        where: { status: "PENDING" },
+        take: 20,
+        orderBy: { createdAt: "desc" },
+      });
+
+      const auditResults = [];
+      for (const p of pendingList) {
+        try {
+          const res = await auditReportedQuestion(p.id);
+          auditResults.push({ id: p.id, res });
+        } catch (e: any) {
+          auditResults.push({ id: p.id, error: e.message });
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        processedCount: auditResults.length,
+        results: auditResults,
+      });
     }
 
     const report = await prisma.reportedQuestion.findUnique({

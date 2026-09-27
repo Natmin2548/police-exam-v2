@@ -245,6 +245,31 @@ export default function AdminDetailsPage() {
     }
   };
 
+  const [isBatchAuditing, setIsBatchAuditing] = useState(false);
+
+  const handleAuditAllPending = async () => {
+    if (!adminEmail) return;
+    setIsBatchAuditing(true);
+    try {
+      const res = await fetch("/api/admin/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "audit_all_pending",
+          email: adminEmail,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาด");
+      showToast(`🤖 AI ตรวจสอบและประมวลผลคำร้องค้างทั้งหมดสำเร็จ (${data.processedCount || 0} ข้อ)`);
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "เกิดข้อผิดพลาดในการสั่ง AI");
+    } finally {
+      setIsBatchAuditing(false);
+    }
+  };
+
   const handleRollback = async (reportId: number) => {
     if (!adminEmail || !confirm("ต้องการย้อนคืนข้อมูลข้อสอบเป็นฉบับเดิมใช่หรือไม่?")) return;
     setSubmittingAction(reportId);
@@ -757,6 +782,34 @@ export default function AdminDetailsPage() {
         {/* =================================================================== */}
         {activeSection === "reports" && (
           <div className="space-y-4">
+            {/* Real-time AI Status Banner */}
+            <div className="bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-indigo-500/10 border border-emerald-500/20 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <span className="text-base">⚡</span>
+                </div>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-2">
+                    <span>ระบบ AI วินิจฉัย & แก้ไขเฉลยอัตโนมัติทำงานอยู่ตลอดเวลา (Real-time Auto-Audit)</span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                  </h4>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    ทันทีที่ผู้สอบส่งรายงาน AI จะตรวจเทียบกับตัวบทกฎหมายและแก้ไขลงฐานข้อมูลทันทีโดยไม่ต้องรอแอดมินมากด
+                  </p>
+                </div>
+              </div>
+
+              {filteredReports.some((r) => r.status === "PENDING") && (
+                <button
+                  type="button"
+                  disabled={isBatchAuditing}
+                  onClick={handleAuditAllPending}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black shadow-xs transition-all cursor-pointer shrink-0 disabled:opacity-50"
+                >
+                  <span>🤖 {isBatchAuditing ? "กำลังตรวจทั้งหมด..." : "สั่ง AI ตรวจข้อค้างทั้งหมดทันที"}</span>
+                </button>
+              )}
+            </div>
             {filteredReports.length === 0 ? (
               <div className="bg-white border border-slate-200/80 rounded-3xl p-12 text-center space-y-3">
                 <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
