@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
       if (isCorrect) {
         const baseGold = 100;
-        const speedBonus = Math.max(0, Math.floor(Number(timeRemaining) * 10));
+        const speedBonus = Math.max(0, Math.min(180, Math.floor(Number(timeRemaining) * 2)));
         const streakBonus = currentMember.streak * 20;
         const gainedGold = baseGold + speedBonus + streakBonus;
         const nextGold = currentMember.gold + gainedGold;
@@ -102,9 +102,23 @@ export async function POST(request: NextRequest) {
     }
 
     // -------------------------------------------------------------------------
-    // Action 2: OPEN_CHEST (เปิดกล่องสุ่มปริศนาชิงทอง)
+    // Action 2: OPEN_CHEST (เปิดกล่องสุ่มปริศนาชิงทอง - เฉพาะคนที่ตอบถูก)
     // -------------------------------------------------------------------------
     if (action === "open_chest") {
+      // 🔒 ตรวจสอบว่าต้องตอบข้อปัจจุบันถูกเท่านั้นถึงจะเปิดกล่องได้!
+      if (!currentMember.isAnswered || currentMember.lastAnswerChoice === null) {
+        return NextResponse.json({ error: "ต้องตอบคำถามก่อนถึงจะเปิดกล่องได้" }, { status: 400 });
+      }
+
+      const isCorrectThisRound =
+        currentQ && Number(currentMember.lastAnswerChoice) === Number(currentQ.correctAnswer);
+
+      if (!isCorrectThisRound) {
+        return NextResponse.json({
+          error: "เฉพาะคนที่ตอบถูกต้องเท่านั้นที่มีสิทธิ์เปิดกล่องสุ่มชิงทอง!",
+        }, { status: 403 });
+      }
+
       // สุ่มผลลัพธ์ของกล่อง
       const roll = Math.random();
       let effectType = "GOLD_100";

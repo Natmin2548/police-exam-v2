@@ -71,6 +71,14 @@ const CHOICE_COLORS = [
   { bg: "bg-emerald-500 hover:bg-emerald-600", text: "text-white", border: "border-emerald-600", label: "ง" },
 ];
 
+const QUESTION_TIME_LIMIT = 90; // ข้อละ 1.5 นาที (90 วินาที)
+
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+};
+
 export default function ArenaRoomPage() {
   const params = useParams();
   const router = useRouter();
@@ -87,13 +95,14 @@ export default function ArenaRoomPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [copiedPin, setCopiedPin] = useState(false);
 
-  // In-Game Question State
-  const [timeLeft, setTimeLeft] = useState(15);
+  // In-Game Question State (90 วินาที = 1.5 นาทีต่อข้อ)
+  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_LIMIT);
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null);
   const [answerResult, setAnswerResult] = useState<{
     isCorrect: boolean;
     gainedGold: number;
     explanation?: string;
+    correctAnswer?: number;
   } | null>(null);
 
   // Mystery Chest State (เมื่อตอบถูก)
@@ -289,11 +298,11 @@ export default function ArenaRoomPage() {
   }, [roomCode, currentUserId, currentUser?.email]);
 
   // ---------------------------------------------------------------------------
-  // 3. Round Countdown Timer
+  // 3. Round Countdown Timer (1.5 นาที = 90 วินาที)
   // ---------------------------------------------------------------------------
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
-    setTimeLeft(15);
+    setTimeLeft(QUESTION_TIME_LIMIT);
 
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
@@ -302,7 +311,7 @@ export default function ArenaRoomPage() {
           handleTimeOut();
           return 0;
         }
-        if (prev <= 5 && soundEnabled) {
+        if (prev <= 10 && soundEnabled) {
           gameSounds.playTick();
         }
         return prev - 1;
@@ -320,19 +329,20 @@ export default function ArenaRoomPage() {
   };
 
   const handleTimeOut = () => {
-    // If player didn't answer in time
+    // If player didn't answer in time -> ตอบผิด ไม่ได้กล่องสุ่ม
     setSelectedChoice((current) => {
       if (current === null) {
         if (soundEnabled) gameSounds.playWrong();
         setAnswerResult({
           isCorrect: false,
           gainedGold: 0,
-          explanation: "หมดเวลาทำข้อสอบแล้ว!",
+          explanation: "หมดเวลาทำข้อสอบแล้ว! (ไม่ได้รับสิทธิ์เปิดกล่องสุ่ม)",
         });
       }
       return current;
     });
-    setShowRoundSummary(true);
+    setShowChestModal(false);
+    setTimeout(() => setShowRoundSummary(true), 1500);
   };
 
   // ---------------------------------------------------------------------------
@@ -390,15 +400,18 @@ export default function ArenaRoomPage() {
           isCorrect: data.isCorrect,
           gainedGold: data.gainedGold,
           explanation: data.explanation,
+          correctAnswer: data.correctAnswer,
         });
 
         if (data.isCorrect) {
           if (soundEnabled) gameSounds.playCorrect();
-          // Open Chest trigger!
+          // 🎁 เฉพาะคนที่ตอบถูกเท่านั้นที่ได้เปิดกล่องสุ่ม!
           setTimeout(() => setShowChestModal(true), 800);
         } else {
           if (soundEnabled) gameSounds.playWrong();
-          setTimeout(() => setShowRoundSummary(true), 1200);
+          // ❌ คนที่ตอบผิด ไม่ได้กล่องสุ่มเด็ดขาด
+          setShowChestModal(false);
+          setTimeout(() => setShowRoundSummary(true), 2500);
         }
 
         // Notify room members
@@ -752,7 +765,7 @@ export default function ArenaRoomPage() {
   if (room.status === "PLAYING" && currentQuestion && !podiumData) {
     const answeredCount = room.members.filter((m) => m.isAnswered).length;
     const isCurrentUserAnswered = selectedChoice !== null;
-    const progressTimerPct = (timeLeft / 15) * 100;
+    const progressTimerPct = (timeLeft / QUESTION_TIME_LIMIT) * 100;
 
     return (
       <div className="min-h-screen bg-[#0B132B] text-white flex flex-col justify-between p-4 sm:p-6 relative overflow-hidden">
@@ -803,13 +816,13 @@ export default function ArenaRoomPage() {
             </div>
           </div>
 
-          {/* Animated 15-second Countdown Bar */}
+          {/* Animated 90-second Countdown Bar */}
           <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700 mb-6">
             <div
               className={`h-full rounded-full transition-all duration-1000 ease-linear ${
-                timeLeft <= 4
+                timeLeft <= 15
                   ? "bg-red-500"
-                  : timeLeft <= 8
+                  : timeLeft <= 35
                   ? "bg-amber-400"
                   : "bg-emerald-400"
               }`}
@@ -822,8 +835,10 @@ export default function ArenaRoomPage() {
         <div className="max-w-3xl mx-auto w-full mb-6">
           <div className="bg-slate-800/90 border border-slate-700 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-sm text-center">
             <div className="flex items-center justify-center gap-1.5 text-slate-400 text-xs font-bold mb-2">
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
-              <span>เหลือเวลาอีก {timeLeft} วินาที</span>
+              <Clock className="w-4 h-4 text-amber-400" />
+              <span>
+                เหลือเวลา: <strong className="text-amber-300 font-mono text-sm">{formatTime(timeLeft)}</strong> นาที ({timeLeft} วินาที)
+              </span>
             </div>
             <h2 className="text-base sm:text-xl font-black text-white leading-relaxed tracking-tight">
               {currentQuestion.questionText}
@@ -832,35 +847,71 @@ export default function ArenaRoomPage() {
         </div>
 
         {/* 4 Big Choices Buttons (Kahoot Colorful Grid) */}
-        <div className="max-w-3xl mx-auto w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+        <div className="max-w-3xl mx-auto w-full grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           {currentQuestion.choices.map((choiceText, idx) => {
             const choiceIndex = idx + 1;
             const style = CHOICE_COLORS[idx] || CHOICE_COLORS[0];
             const isSelected = selectedChoice === choiceIndex;
+            const isThisCorrect = answerResult?.correctAnswer ? choiceIndex === answerResult.correctAnswer : false;
+
+            let choiceStateClass = `${style.bg} ${style.border} active:scale-98 shadow-md`;
+            if (isCurrentUserAnswered) {
+              if (isSelected) {
+                if (answerResult?.isCorrect) {
+                  choiceStateClass = "bg-emerald-600 border-emerald-400 ring-4 ring-emerald-400/50 scale-[1.02] text-white";
+                } else {
+                  choiceStateClass = "bg-red-600 border-red-400 ring-4 ring-red-400/50 scale-[1.02] text-white";
+                }
+              } else if (isThisCorrect) {
+                // เฉลยข้อที่ถูกถ้าผู้ใช้ตอบผิด
+                choiceStateClass = "bg-emerald-800/80 border-2 border-emerald-400 text-white ring-2 ring-emerald-400/40";
+              } else {
+                choiceStateClass = "opacity-40 bg-slate-800/50 border-slate-700";
+              }
+            }
 
             return (
               <button
                 key={idx}
                 disabled={isCurrentUserAnswered}
                 onClick={() => handleAnswer(choiceIndex)}
-                className={`cursor-pointer min-h-[72px] p-4 rounded-2xl border-2 transition-all flex items-center gap-3 text-left ${
-                  isCurrentUserAnswered
-                    ? isSelected
-                      ? "ring-4 ring-white bg-slate-800 border-white scale-[1.02]"
-                      : "opacity-40 bg-slate-800/50 border-slate-700"
-                    : `${style.bg} ${style.border} active:scale-98 shadow-md`
-                }`}
+                className={`cursor-pointer min-h-[72px] p-4 rounded-2xl border-2 transition-all flex items-center justify-between text-left ${choiceStateClass}`}
               >
-                <span className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-black text-sm shrink-0">
-                  {style.label}
-                </span>
-                <span className="text-xs sm:text-sm font-bold text-white leading-snug">
-                  {choiceText}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center font-black text-sm shrink-0">
+                    {style.label}
+                  </span>
+                  <span className="text-xs sm:text-sm font-bold text-white leading-snug">
+                    {choiceText}
+                  </span>
+                </div>
+                {isCurrentUserAnswered && isSelected && (
+                  <span className="text-lg shrink-0">
+                    {answerResult?.isCorrect ? "✅" : "❌"}
+                  </span>
+                )}
+                {isCurrentUserAnswered && !isSelected && isThisCorrect && (
+                  <span className="text-[11px] font-black bg-emerald-500 text-slate-950 px-2.5 py-0.5 rounded-full shrink-0">
+                    คำตอบที่ถูกต้อง
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
+
+        {/* Answer Feedback Banner (แจ้งชัดเจนว่าตอบผิดจะไม่ได้กล่องสุ่ม) */}
+        {isCurrentUserAnswered && answerResult && !answerResult.isCorrect && (
+          <div className="max-w-3xl mx-auto w-full bg-red-950/70 border-2 border-red-500/70 rounded-2xl p-4 text-center mb-4 animate-in fade-in duration-300 shadow-xl">
+            <div className="flex items-center justify-center gap-2 text-red-400 font-black text-sm mb-1">
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+              <span>❌ ตอบไม่ถูกต้อง! คุณไม่ได้รับสิทธิ์เปิดกล่องสุ่มรอบนี้</span>
+            </div>
+            <p className="text-xs text-slate-300 mt-1 max-w-xl mx-auto">
+              คำอธิบาย: {answerResult.explanation || currentQuestion.explanation || "จำข้อนี้ไว้ แล้วลุยต่อในข้อถัดไป!"}
+            </p>
+          </div>
+        )}
 
         {/* Bottom Status & Round Summary Ticker */}
         <div className="max-w-3xl mx-auto w-full flex items-center justify-between text-xs font-bold text-slate-400 px-2">
@@ -888,9 +939,9 @@ export default function ArenaRoomPage() {
         </div>
 
         {/* =================================================================== */}
-        {/* MODAL: MYSTERY CHEST SELECTION (เปิดเมื่อตอบถูก) */}
+        {/* MODAL: MYSTERY CHEST SELECTION (เปิดเฉพาะเมื่อตอบถูกเท่านั้น!) */}
         {/* =================================================================== */}
-        {showChestModal && (
+        {showChestModal && answerResult?.isCorrect && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
             <div className="max-w-md w-full text-center">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-400 text-slate-900 mb-3 shadow-lg">
