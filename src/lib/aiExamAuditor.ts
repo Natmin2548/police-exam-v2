@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { prisma } from "@/lib/prisma";
 
 export interface AIQuestionAuditResult {
@@ -42,7 +44,7 @@ function getOpenRouterKey(): string {
 }
 
 // =============================================================================
-// SUBJECT-SPECIFIC PROMPT ENGINES (แยกบทบาทและกติกาเฉพาะวิชา ไม่เหมารวม)
+// SUBJECT-SPECIFIC PROMPT ENGINES & KNOWLEDGE RETRIEVAL
 // =============================================================================
 
 export interface SubjectConfig {
@@ -212,11 +214,83 @@ export function getSubjectConfig(categoryInput: string, textContext: string): Su
     rules: [
       "ตรวจสอบกับตัวบทกฎหมายปัจจุบันอย่างเคร่งครัด โดยเฉพาะ พ.ร.บ.ตำรวจแห่งชาติ พ.ศ. ๒๕๖๕ (ระวังผู้ใช้หรือข้อสอบจำ พ.ร.บ.ตำรวจ ๒๕๔๗ ฉบับเก่ามา)",
       "อ้างอิงเลขมาตรา (มาตรา วรรค อนุมาตรา) ให้ตรงกับตัวบทจริงเท่านั้น ห้ามจำสับสนหรืออ้างอิงผิดมาตรา",
-      "แยกแยะระหว่างความผิดอาญายอมความได้กับยอมความไม่ได้, องค์ประกอบความผิด, และอำนาจสอบสวน/จับกุม/ค้น อย่างแม่นยำ",
+      "แยกแยะระหว่างองค์ประกอบความผิดสำคัญ เช่น ลักทรัพย์ (ม.334), วิ่งราวทรัพย์ (ม.336), ชิงทรัพย์ (ม.339 ใช้กำลังประทุษร้าย/ขู่เข็ญในทันใด), ปล้นทรัพย์ (ม.340 ร่วมกันตั้งแต่ 3 คนขึ้นไป)",
     ],
     referenceLabel: "พระราชบัญญัติตำรวจแห่งชาติ ๒๕๖๕ / ป.อาญา / ป.วิ.อาญา มาตรา...",
     knowledgeLabel: "คลังความรู้กฎหมายที่เคยบันทึกไว้ในระบบ",
   };
+}
+
+// In-memory cache for static subject knowledge files
+let cachedOfficialKnowledge: Record<string, any[]> | null = null;
+
+/**
+ * ดึงความรู้ทางการจากไฟล์ข้อมูลของระบบ (Official Knowledge Dataset)
+ */
+function loadOfficialKnowledge(subjectCode: string, keywords: string[]): string[] {
+  try {
+    if (!cachedOfficialKnowledge) {
+      cachedOfficialKnowledge = {};
+      const dataDir = path.join(process.cwd(), "src/data");
+      const files: Record<string, string> = {
+        LAW: "law_full.json",
+        SARABAN: "saraban_full.json",
+        SARABAN_54: "police_saraban_54.json",
+        COMPUTER: "computer_full.json",
+        MATH: "math_full.json",
+        THAI: "thai_full.json",
+        ETHICS_SOCIETY: "social_full.json",
+      };
+
+      for (const [key, fname] of Object.entries(files)) {
+        const fp = path.join(dataDir, fname);
+        if (fs.existsSync(fp)) {
+          try {
+            cachedOfficialKnowledge[key] = JSON.parse(fs.readFileSync(fp, "utf8"));
+          } catch (e) {}
+        }
+      }
+    }
+
+    const docs = [
+      ...(cachedOfficialKnowledge[subjectCode] || []),
+      ...(subjectCode === "SARABAN" ? cachedOfficialKnowledge["SARABAN_54"] || [] : []),
+    ];
+
+    if (!docs || docs.length === 0) return [];
+
+    const searchTerms = keywords
+      .join(" ")
+      .toLowerCase()
+      .replace(/[^\u0E00-\u0E7Fa-zA-Z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 2);
+
+    const matchedDocs: { title: string; snippet: string; score: number }[] = [];
+
+    for (const item of docs) {
+      const text = ((item.title || "") + " " + (item.content || "")).toLowerCase();
+      let score = 0;
+      for (const term of searchTerms) {
+        if (text.includes(term)) {
+          score += term.length >= 4 ? 3 : 1;
+        }
+      }
+      if (score > 0) {
+        matchedDocs.push({
+          title: item.title,
+          snippet: item.content ? item.content.slice(0, 1200) : "",
+          score,
+        });
+      }
+    }
+
+    matchedDocs.sort((a, b) => b.score - a.score);
+    return matchedDocs.slice(0, 2).map((d) => `[ฐานข้อมูลราชการ: ${d.title}]\n${d.snippet}`);
+  } catch (err) {
+    console.warn("[AI Auditor] Failed to load official knowledge:", err);
+    return [];
+  }
 }
 
 function buildExaminerPrompt(
@@ -225,43 +299,65 @@ function buildExaminerPrompt(
   knowledgeContext: string[],
   subjectCfg: SubjectConfig
 ): string {
+  let cleanUserReason = userReason;
+  try {
+    const p = JSON.parse(userReason);
+    if (p && typeof p === "object") {
+      cleanUserReason = p.details || p.reasonType || userReason;
+    }
+  } catch (e) {}
+
   return `${subjectCfg.role}
 
-[ข้อมูลข้อสอบปัจจุบัน]
-หมวดวิชา: ${subjectCfg.displayName} (${questionData.category || questionData.topic || "-"})
+================================================================================
+🚨 [คำสั่งสำคัญสูงสุด: ให้อ่านและวิเคราะห์ข้อร้องเรียนของผู้ใช้ก่อนเป็นอันดับแรก]
+================================================================================
+1. ผู้ใช้ (ผู้เข้าสอบ) ได้รายงานข้อผิดพลาดเข้ามาดังนี้:
+   👉 "${cleanUserReason}"
+   (ข้อความเดิม: "${userReason}")
+
+2. ⚠️ กฎเหล็ก: ห้ามเชื่อหรือเข้าข้างเฉลยเดิมและคำอธิบายเดิมของระบบเด็ดขาด (ZERO CONFIRMATION BIAS)
+   - ข้อสอบในระบบมีโอกาสที่เฉลยเดิมจะผิด หรือผู้สร้างข้อสอบพิมพ์คำอธิบายผิดมาตั้งแต่แรก
+   - จงตั้งสมมติฐานว่า "คำทักท้วงของผู้ใช้อาจเป็นฝ่ายถูกต้อง" แล้วนำมาพิสูจน์ตามหลักวิชาการ/ตัวบทกฎหมายจริง
+   - ตัวอย่างสำคัญ: หากผู้ใช้ทักท้วงว่า "ตอบชิงทรัพย์ ไม่ใช่ปล้นทรัพย์ เพราะปล้นทรัพย์ต้อง 3 คนขึ้นไป" ให้ดูข้อเท็จจริงในโจทย์ว่ามีกี่คน (ถ้ามีผู้กระทำคนเดียว ย่อมเป็นปล้นทรัพย์ไม่ได้เด็ดขาด เพราะปล้นทรัพย์ต้อง 3 คนขึ้นไปตาม ป.อาญา ม.340 การใช้กำลังคนเดียวเอาทรัพย์จึงเป็น 'ชิงทรัพย์' ม.339 ผู้ใช้จึงถูกต้อง 100%)
+
+3. [หลักเกณฑ์และกติกาการตรวจสอบเฉพาะใน${subjectCfg.displayName}]
+${subjectCfg.rules.map((r, i) => `   ${i + 1}. ${r}`).join("\n")}
+
+================================================================================
+📚 [ข้อมูลอ้างอิงจากคลังความรู้ทางการของระบบ]
+================================================================================
+${knowledgeContext.length > 0 ? knowledgeContext.join("\n\n") : "ไม่มีข้อมูลเฉพาะในคลัง ให้ยึดตามหลักวิชาการสากล"}
+
+================================================================================
+📝 [ข้อมูลข้อสอบในระบบที่ถูกรายงาน]
+================================================================================
 โจทย์: ${questionData.questionText}
 ตัวเลือก 1: ${questionData.choice1}
 ตัวเลือก 2: ${questionData.choice2}
 ตัวเลือก 3: ${questionData.choice3}
 ตัวเลือก 4: ${questionData.choice4}
-เฉลยเดิม: ข้อ ${questionData.correctAnswer}
-คำอธิบายเดิม: ${questionData.explanation || "-"}
+เฉลยเดิมในระบบ (อาจผิด): ข้อ ${questionData.correctAnswer}
+คำอธิบายเดิมในระบบ (อาจผิด): ${questionData.explanation || "-"}
 
-[ข้อความรายงานจากผู้เข้าสอบ]
-"${userReason}"
-
-[${subjectCfg.knowledgeLabel}]
-${knowledgeContext.length > 0 ? knowledgeContext.join("\n- ") : "ยังไม่มีข้อมูลเฉพาะในคลัง"}
-
-[กติกาและหลักเกณฑ์การตรวจสอบเฉพาะวิชานี้]
-${subjectCfg.rules.map((r, i) => `${i + 1}. ${r}`).join("\n")}
-*ข้อควรระวัง: ผู้ใช้อาจเข้าใจผิดเอง หรือจำข้อมูลเก่ามา ตรวจสอบกับหลักวิชาการและข้อมูลที่เป็นปัจจุบันให้ถูกต้องเด็ดขาด*
-
+================================================================================
+⚖️ [ผลการตัดสิน]
+================================================================================
 ตอบกลับเป็น JSON เท่านั้น (ห้ามมีคำนำหรือ markdown code block ครอบ) ตามโครงสร้างนี้:
 {
-  "isReportValid": true หรือ false,
+  "isReportValid": true (ถ้าข้อสอบเดิมเฉลยผิด/ผู้ใช้ทักท้วงถูกต้อง) หรือ false (ถ้าข้อสอบเดิมถูกต้องแล้ว),
   "errorType": "WRONG_ANSWER" | "TYPO" | "AMBIGUOUS" | "OUTDATED_LAW" | "NO_ERROR",
   "confidence": ตัวเลข 0.00 ถึง 1.00,
   "legalReference": "${subjectCfg.referenceLabel}",
-  "coreFact": "สาระสำคัญความรู้ที่เป็นข้อยุติสำหรับเก็บเข้าคลังความรู้",
-  "detailedReason": "คำอธิบายภาษาไทยสรุปเหตุผลตามหลักวิชาอย่างสุภาพ ชัดเจน",
+  "coreFact": "สาระสำคัญความรู้ที่ถูกต้องสำหรับเก็บเข้าคลังความรู้",
+  "detailedReason": "คำอธิบายภาษาไทยสรุปเหตุผลอย่างสุภาพ ชัดเจน ชี้จุดถูก-ผิดเทียบกับคำร้องของผู้ใช้",
   "correctedQuestion": {
-    "questionText": "โจทย์ที่แก้ไขแล้ว (ถ้าไม่ต้องแก้โจทย์ให้ใช้ของเดิม)",
+    "questionText": "โจทย์ที่ถูกต้อง",
     "choice1": "ตัวเลือก 1",
     "choice2": "ตัวเลือก 2",
     "choice3": "ตัวเลือก 3",
     "choice4": "ตัวเลือก 4",
-    "correctAnswer": ตัวเลข 1-4 ที่ถูกต้อง,
+    "correctAnswer": ตัวเลข 1-4 ที่ถูกต้องแท้จริงตามหลักวิชา,
     "explanation": "คำอธิบายเฉลยที่ถูกต้องและอ้างอิงหลักการชัดเจน"
   }
 }`;
@@ -273,8 +369,14 @@ function buildCrossAuditorPrompt(
   examinerProposal: AIQuestionAuditResult,
   subjectCfg: SubjectConfig
 ): string {
+  let cleanUserReason = userReason;
+  try {
+    const p = JSON.parse(userReason);
+    if (p && typeof p === "object") cleanUserReason = p.details || p.reasonType || userReason;
+  } catch (e) {}
+
   return `คุณคือผู้ตรวจประเมินข้อสอบอิสระ (Independent Exam Auditor) ใน${subjectCfg.displayName}
-จงตรวจสอบผลการตรวจข้อสอบของระบบว่าถูกต้องตรงตามหลักวิชาการและข้อเท็จจริงหรือไม่
+หน้าที่ของคุณคือตรวจสอบผลการตัดสินของ Examiner อย่างเข้มงวดและเป็นกลางที่สุด
 
 [โจทย์ข้อสอบ]
 ${questionData.questionText}
@@ -282,28 +384,29 @@ ${questionData.questionText}
 2. ${questionData.choice2}
 3. ${questionData.choice3}
 4. ${questionData.choice4}
-เฉลยเดิม: ข้อ ${questionData.correctAnswer}
+เฉลยเดิมในระบบ: ข้อ ${questionData.correctAnswer}
 
-[ผู้ใช้ร้องเรียน]
-"${userReason}"
+[คำทักท้วงของผู้ใช้ (User Complaint)]
+"${cleanUserReason}"
 
-[ผลการวินิจฉัยของ Examiner ใน${subjectCfg.displayName}]
-มีข้อผิดพลาด: ${examinerProposal.isReportValid ? "จริง" : "ไม่จริง (ข้อสอบเดิมถูกแล้ว)"}
-เฉลยใหม่ที่เสนอ: ข้อ ${examinerProposal.correctedQuestion?.correctAnswer || questionData.correctAnswer}
+[ผลการวินิจฉัยของ Examiner]
+ข้อสอบมีข้อผิดพลาด: ${examinerProposal.isReportValid ? "จริง (ผู้ใช้ทักท้วงถูกต้อง หรือข้อสอบผิด)" : "ไม่จริง (ข้อสอบเดิมถูกต้องอยู่แล้ว)"}
+เฉลยที่เสนอ: ข้อ ${examinerProposal.correctedQuestion?.correctAnswer || questionData.correctAnswer}
 หลักอ้างอิง: ${examinerProposal.legalReference || "-"}
 เหตุผล: ${examinerProposal.detailedReason}
 
-คุณเห็นชอบกับการตัดสินใน${subjectCfg.displayName}นี้หรือไม่?
+⚠️ คำเตือน: อย่าหลงเชื่อเฉลยเดิมในระบบ ตรวจสอบกับหลักความจริงทางวิชาการและข้อร้องเรียนของผู้ใช้
+คุณเห็นชอบกับการตัดสินนี้หรือไม่?
 ตอบกลับเป็น JSON เท่านั้น:
 {
   "agreesWithExaminer": true หรือ false,
   "confidence": ตัวเลข 0.00 ถึง 1.00,
-  "feedback": "ความเห็นสั้นๆ ตามหลักวิชา"
+  "feedback": "ความเห็นสั้นๆ ชัดเจน"
 }`;
 }
 
 // =============================================================================
-// CALLERS (GROQ & OPENROUTER WITH PROMPT PASSING)
+// CALLERS (GROQ & OPENROUTER)
 // =============================================================================
 
 async function callGroqExaminer(
@@ -492,8 +595,8 @@ export async function auditReportedQuestion(reportId: number) {
       include: { user: true },
     });
 
-    if (!report || report.status !== "PENDING") {
-      return { success: false, message: "Report not found or already processed" };
+    if (!report) {
+      return { success: false, message: "Report not found" };
     }
 
     // Find the original question from Question table
@@ -513,7 +616,7 @@ export async function auditReportedQuestion(reportId: number) {
     const rawCategory = question.topic || question.examSet?.category || "";
     const subjectCfg = getSubjectConfig(rawCategory, `${report.reason} ${question.questionText}`);
 
-    // 1. Retrieve relevant memories from ExamKnowledgeBank (RAG)
+    // 1. Retrieve relevant memories from ExamKnowledgeBank (RAG) + Official Knowledge Data files
     const relevantKnowledge = await prisma.examKnowledgeBank.findMany({
       where: {
         OR: [
@@ -523,20 +626,33 @@ export async function auditReportedQuestion(reportId: number) {
         ],
       },
       orderBy: { timesReferenced: "desc" },
-      take: 5,
+      take: 3,
     });
-    const knowledgeSnippets = relevantKnowledge.map(
-      (k) => `[${k.legalReference || k.topic}]: ${k.coreFact}`
+
+    const dbKnowledgeSnippets = relevantKnowledge.map(
+      (k) => `[คลังความรู้สะสม: ${k.legalReference || k.topic}]: ${k.coreFact}`
     );
 
-    // 2. Primary AI Examiner (Subject Specialized)
-    let primaryResult = await callGroqExaminer(question, report.reason, knowledgeSnippets, subjectCfg);
+    // Retrieve from official system files (src/data/*.json)
+    const officialKnowledgeSnippets = loadOfficialKnowledge(subjectCfg.code, [
+      question.questionText,
+      report.reason,
+      question.choice1,
+      question.choice2,
+      question.choice3,
+      question.choice4,
+    ]);
+
+    const allKnowledge = [...officialKnowledgeSnippets, ...dbKnowledgeSnippets];
+
+    // 2. Primary AI Examiner (Subject Specialized + User Complaint First)
+    let primaryResult = await callGroqExaminer(question, report.reason, allKnowledge, subjectCfg);
     let primaryEngine = "Groq GPT-OSS-120B";
     let crossEngine = "OpenRouter Llama-3.3";
 
     if (!primaryResult) {
       console.log(`[AI Auditor] Groq examiner unavailable for ${subjectCfg.code}, falling back to OpenRouter...`);
-      primaryResult = await callOpenRouterExaminer(question, report.reason, knowledgeSnippets, subjectCfg);
+      primaryResult = await callOpenRouterExaminer(question, report.reason, allKnowledge, subjectCfg);
       primaryEngine = "OpenRouter Llama-3.3";
       crossEngine = "Groq GPT-OSS-120B";
     }
