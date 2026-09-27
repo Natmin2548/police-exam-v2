@@ -206,6 +206,78 @@ export default function AdminDetailsPage() {
     }
   };
 
+  const handleAiAudit = async (reportId: number) => {
+    if (!adminEmail) return;
+    setSubmittingAction(reportId);
+    try {
+      const res = await fetch("/api/admin/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "re_audit_ai",
+          reportId,
+          email: adminEmail,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "เกิดข้อผิดพลาดในการสั่ง AI");
+
+      setData((prev) => {
+        if (!prev) return prev;
+        const updated = prev.recentReports.map((r) =>
+          r.id === reportId ? { ...r, ...data.report } : r
+        );
+        return {
+          ...prev,
+          recentReports: updated,
+          reportedCount: updated.filter((r) => r.status === "PENDING").length,
+        };
+      });
+
+      showToast(`🤖 ${data.result?.message || "AI ตรวจสอบและประมวลผลคำร้องสำเร็จ"}`);
+    } catch (err: any) {
+      alert(err.message || "เกิดข้อผิดพลาด");
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
+  const handleRollback = async (reportId: number) => {
+    if (!adminEmail || !confirm("ต้องการย้อนคืนข้อมูลข้อสอบเป็นฉบับเดิมใช่หรือไม่?")) return;
+    setSubmittingAction(reportId);
+    try {
+      const res = await fetch("/api/admin/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "rollback",
+          reportId,
+          email: adminEmail,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "ไม่สามารถกู้คืนได้");
+
+      setData((prev) => {
+        if (!prev) return prev;
+        const updated = prev.recentReports.map((r) =>
+          r.id === reportId ? { ...r, ...data.report } : r
+        );
+        return {
+          ...prev,
+          recentReports: updated,
+          reportedCount: updated.filter((r) => r.status === "PENDING").length,
+        };
+      });
+
+      showToast("↩️ กู้คืนข้อมูลข้อสอบเป็นฉบับเดิมเรียบร้อยแล้ว");
+    } catch (err: any) {
+      alert(err.message || "เกิดข้อผิดพลาด");
+    } finally {
+      setSubmittingAction(null);
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // JSON Report Reason Parser
   // ---------------------------------------------------------------------------
@@ -728,11 +800,26 @@ export default function AdminDetailsPage() {
                           className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border ${
                             isResolved
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : report.status === "REJECTED"
+                              ? "bg-slate-100 text-slate-600 border-slate-200"
                               : "bg-amber-50 text-amber-700 border-amber-200"
                           }`}
                         >
-                          {isResolved ? "✅ ตรวจสอบแล้ว" : "⏳ รอดำเนินการ"}
+                          {isResolved
+                            ? "✅ ตรวจสอบแล้ว"
+                            : report.status === "REJECTED"
+                            ? "❌ ปิดคำร้อง (เฉลยเดิมถูกต้อง)"
+                            : "⏳ รอดำเนินการ"}
                         </span>
+
+                        {report.autoResolved && (
+                          <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200 flex items-center gap-1 shadow-2xs">
+                            <span>🤖 AI อนุมัติอัตโนมัติ</span>
+                            {report.aiConfidence && (
+                              <span>({Math.round(report.aiConfidence * 100)}%)</span>
+                            )}
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -801,6 +888,28 @@ export default function AdminDetailsPage() {
                           <Check className="w-3.5 h-3.5 stroke-[3]" />
                           <span>{isResolved ? "ยกเลิกเครื่องหมายแก้ไข" : "กดติ๊กแก้ไขแล้ว"}</span>
                         </button>
+
+                        {/* AI Instant Audit Button */}
+                        <button
+                          type="button"
+                          disabled={isSubmitting}
+                          onClick={() => handleAiAudit(report.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-black transition-all cursor-pointer shadow-2xs"
+                        >
+                          <span>🤖 {isSubmitting ? "กำลังตรวจ..." : "สั่ง AI วินิจฉัย & แก้ไข"}</span>
+                        </button>
+
+                        {/* 1-Click Rollback Button if backup exists */}
+                        {report.previousData && (
+                          <button
+                            type="button"
+                            disabled={isSubmitting}
+                            onClick={() => handleRollback(report.id)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-black transition-all cursor-pointer"
+                          >
+                            <span>↩️ กู้คืนเดิม</span>
+                          </button>
+                        )}
 
                         {/* Direct link to edit question */}
                         <Link

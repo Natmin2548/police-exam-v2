@@ -244,6 +244,9 @@ function ExamSessionContent() {
   // Modals & Submission state
   const [showExitModal, setShowExitModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportFeedback, setReportFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [examResult, setExamResult] = useState<{
     scorePct: number;
@@ -1033,28 +1036,135 @@ function ExamSessionContent() {
         </div>
       )}
 
-      {/* Report Question Modal */}
+      {/* Autonomous AI-Powered Report Question Modal */}
       {showReportModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl text-center">
-            <h3 className="text-lg font-black text-slate-900">
-              แจ้งข้อสอบผิดพลาด
-            </h3>
-            <p className="text-xs text-slate-500 leading-relaxed font-medium">
-              ขอบคุณที่ช่วยตรวจสอบ ระบบจะบันทึกข้อสอบข้อนี้เพื่อให้ทีมงานตรวจสอบความถูกต้องของโจทย์และเฉลย
-            </p>
-            <div className="pt-2">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl text-left border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-black text-sm">
+                  ⚠️
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    รายงานข้อสอบข้อนี้
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-bold">
+                    ข้อ #{currentQ?.id} • {currentQ?.category || category}
+                  </p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => {
                   setShowReportModal(false);
-                  alert("บันทึกการแจ้งข้อผิดเรียบร้อย ขอบคุณครับ");
+                  setReportFeedback(null);
                 }}
-                className="w-full py-2.5 px-4 rounded-xl bg-[#BD1B0B] text-white text-xs font-black hover:bg-[#A81507] cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
               >
-                ตกลง
+                ✕
               </button>
             </div>
+
+            {reportFeedback ? (
+              <div className="py-6 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl mx-auto shadow-sm">
+                  🤖
+                </div>
+                <h4 className="text-sm font-black text-slate-900">
+                  ระบบ AI ประมวลผลคำร้องสำเร็จ
+                </h4>
+                <p className="text-xs text-slate-600 font-medium leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+                  {reportFeedback}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowReportModal(false);
+                    setReportFeedback(null);
+                    setReportReason("");
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black shadow-sm transition-all"
+                >
+                  ปิดหน้าต่าง
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-500 font-medium">
+                  กรุณาระบุข้อผิดพลาด เช่น เฉลยผิด, ข้อความกำกวม, หรือกฎหมายฉบับใหม่ (ระบบ AI จะช่วยวิเคราะห์และปรับปรุงคลังข้อสอบทันที)
+                </p>
+
+                {/* Quick tags */}
+                <div className="flex flex-wrap gap-1.5">
+                  {["เฉลยข้อนี้ผิด", "ข้อกฎหมายมีการแก้ไขใหม่", "พิมพ์ผิด / ช้อยส์ซ้ำ", "โจทย์ไม่ชัดเจน"].map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setReportReason((prev) => (prev ? `${prev}, ${tag}` : tag))}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                    >
+                      + {tag}
+                    </button>
+                  ))}
+                </div>
+
+                <textarea
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  placeholder="พิมพ์รายละเอียดเพิ่มเติมที่นี่..."
+                  rows={3}
+                  className="w-full p-3 rounded-2xl border border-slate-200 text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-[#BD1B0B]/30 focus:border-[#BD1B0B] text-slate-800 resize-none"
+                />
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(false)}
+                    className="w-1/3 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-colors"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmittingReport || !reportReason.trim() || !currentQ}
+                    onClick={async () => {
+                      if (!reportReason.trim() || !currentQ) return;
+                      setIsSubmittingReport(true);
+                      try {
+                        const res = await fetch("/api/reports", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            questionId: currentQ.id,
+                            questionText: currentQ.questionText,
+                            reason: reportReason,
+                            email: userEmail,
+                          }),
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                          setReportFeedback(data.message || "ส่งรายงานเรียบร้อยแล้ว AI กำลังตรวจสอบ");
+                        } else {
+                          alert(data.error || "ไม่สามารถส่งรายงานได้");
+                        }
+                      } catch (err: any) {
+                        alert("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+                      } finally {
+                        setIsSubmittingReport(false);
+                      }
+                    }}
+                    className="w-2/3 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#BD1B0B] to-[#D32F2F] hover:from-[#A81507] hover:to-[#BD1B0B] text-white text-xs font-black shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    {isSubmittingReport ? (
+                      <span>🤖 AI กำลังตรวจสอบ...</span>
+                    ) : (
+                      <span>⚡ ส่งให้ AI ตรวจสอบทันที</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

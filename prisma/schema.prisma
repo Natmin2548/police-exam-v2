@@ -237,8 +237,12 @@ model ReportedQuestion {
   questionId   String
   questionText String    @db.Text
   reason       String    @db.Text
-  status       String    @default("PENDING") // PENDING, RESOLVED
+  status       String    @default("PENDING") // PENDING, RESOLVED, REJECTED
   adminReply   String?   @db.Text
+  aiAnalysis   Json?
+  aiConfidence Float?
+  autoResolved Boolean   @default(false)
+  previousData Json?
   resolvedAt   DateTime?
   resolvedBy   String?
   createdAt    DateTime  @default(now())
@@ -246,6 +250,22 @@ model ReportedQuestion {
 
   @@index([userId])
   @@index([status])
+}
+
+// คลังความรู้ความจำที่ AI เรียนรู้สะสมไว้เพื่อความแม่นยำยิ่งขึ้นเรื่อยๆ
+model ExamKnowledgeBank {
+  id              Int      @id @default(autoincrement())
+  category        String   // เช่น กฎหมายอาญา, พ.ร.บ.ตำรวจ, ภาษาอังกฤษ
+  topic           String   // หัวข้อความรู้
+  legalReference  String?  // เช่น พ.ร.บ.ตำรวจแห่งชาติ พ.ศ. 2565 มาตรา 60
+  coreFact        String   @db.Text // สาระสำคัญและข้อเท็จจริงที่ถูกต้อง
+  sampleQuestion  String?  @db.Text // ตัวอย่างข้อสอบ
+  timesReferenced Int      @default(0) // สถิติที่ AI เคยใช้อ้างอิง
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category])
+  @@index([topic])
 }
 
 model SupportTicket {
