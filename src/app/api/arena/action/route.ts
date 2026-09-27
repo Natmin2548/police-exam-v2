@@ -199,89 +199,137 @@ export async function POST(request: NextRequest) {
       const sortedOthers = [...otherMembers].sort((a, b) => b.gold - a.gold);
       const topTarget = sortedOthers[0];
 
-      if (roll < 0.25) {
-        // +50 Gold
-        effectType = "GOLD_50";
-        goldDelta = 50;
-        message = "เปิดได้เหรียญทอง +50G!";
-        await prisma.partyMember.update({
-          where: { id: currentMember.id },
-          data: { gold: { increment: 50 } },
-        });
-      } else if (roll < 0.50) {
-        // +100 Gold
-        effectType = "GOLD_100";
-        goldDelta = 100;
-        message = "เปิดได้หีบสมบัติ +100G!";
-        await prisma.partyMember.update({
-          where: { id: currentMember.id },
-          data: { gold: { increment: 100 } },
-        });
-      } else if (roll < 0.65) {
-        // +200 Gold JACKPOT
-        effectType = "GOLD_200";
-        goldDelta = 200;
-        message = "🎉 JACKPOT! ขุมทรัพย์ทองคำแท่ง +200G!";
-        await prisma.partyMember.update({
-          where: { id: currentMember.id },
-          data: { gold: { increment: 200 } },
-        });
-      } else if (roll < 0.85 && topTarget && topTarget.gold > 50) {
-        // STEAL (ขโมย 20% จากคนทองเยอะสุด)
-        targetUsername = topTarget.username;
-        if (topTarget.hasShield) {
-          // โดนโล่ป้องกัน!
-          isBlockedByShield = true;
-          effectType = "STEAL_BLOCKED";
-          goldDelta = 0;
-          message = `🛡️ ถูกขัดขวาง! ${topTarget.username} มีโล่ตำรวจป้องกันการขโมย!`;
-          // ล้างโล่ของเป้าหมาย
-          await prisma.partyMember.update({
-            where: { id: topTarget.id },
-            data: { hasShield: false },
-          });
-        } else {
-          // ขโมยสำเร็จ
-          const stolenAmount = Math.max(30, Math.floor(topTarget.gold * 0.2));
-          effectType = "STEAL_SUCCESS";
-          goldDelta = stolenAmount;
-          message = `🥷 ย่องเบาสำเร็จ! ขโมยทองจาก ${topTarget.username} มาได้ +${stolenAmount}G!`;
+      if (roll < 0.16) {
+        // 1. 🔄 SWAP GOLD (สลับคะแนนทองกับคนที่ทองเยอะกว่า หรืออันดับ 1!)
+        if (topTarget && topTarget.gold > currentMember.gold) {
+          targetUsername = topTarget.username;
+          effectType = "SWAP_GOLD";
+          const myOldGold = currentMember.gold;
+          const targetGold = topTarget.gold;
+          goldDelta = targetGold - myOldGold;
+          message = `🔄 พลิกเกมมหากาพย์! คุณสลับคะแนนทองกับ ${topTarget.username} (${targetGold}G ⇄ ${myOldGold}G)!`;
 
           await prisma.$transaction([
             prisma.partyMember.update({
               where: { id: topTarget.id },
-              data: { gold: Math.max(0, topTarget.gold - stolenAmount) },
+              data: { gold: myOldGold },
             }),
             prisma.partyMember.update({
               where: { id: currentMember.id },
-              data: { gold: currentMember.gold + stolenAmount },
+              data: { gold: targetGold, hasPickedChest: true, pickedChest: chosenNum },
             }),
           ]);
+        } else {
+          // ถ้าตัวเองเป็นผู้นำอยู่แล้ว หรือไม่มีคนอื่นให้สลับ -> มอบโบนัสทองคำผู้นำ
+          effectType = "GOLD_BONUS";
+          goldDelta = 120;
+          message = `🌟 ขุมทรัพย์ผู้นำสูงสุด! รับทองคำโบนัสเพิ่ม +120G!`;
+          await prisma.partyMember.update({
+            where: { id: currentMember.id },
+            data: { gold: { increment: 120 }, hasPickedChest: true, pickedChest: chosenNum },
+          });
         }
-      } else if (roll < 0.93) {
-        // SHIELD
-        effectType = "SHIELD";
-        goldDelta = 0;
-        message = "🛡️ ได้รับ 'โล่ตำรวจพิทักษ์ทรัพย์' ป้องกันการถูกขโมยทอง 1 ครั้ง!";
+      } else if (roll < 0.32) {
+        // 2. ✖️2️⃣ DOUBLE GOLD (คูณสองทองคำทั้งหมดของตนเอง!)
+        effectType = "DOUBLE_GOLD";
+        const multiplierBonus = Math.max(100, currentMember.gold);
+        goldDelta = multiplierBonus;
+        message = currentMember.gold > 0
+          ? `✖️2️⃣ ทวีคูณมหัศจรรย์! ทองคำทั้งหมดของคุณ x2 (+${multiplierBonus}G)!`
+          : `✖️2️⃣ ทวีคูณเริ่มต้น! ได้รับทองคำเริ่มต้นก้อนโต +100G!`;
+
         await prisma.partyMember.update({
           where: { id: currentMember.id },
-          data: { hasShield: true },
+          data: { gold: { increment: multiplierBonus }, hasPickedChest: true, pickedChest: chosenNum },
         });
-      } else {
-        // BOMB (-15% gold)
+      } else if (roll < 0.52) {
+        // 3. 🥷 STEAL GOLD (ขโมย 25% จากคนที่มีทองเยอะสุด)
+        if (topTarget && topTarget.gold > 20) {
+          targetUsername = topTarget.username;
+          if (topTarget.hasShield) {
+            isBlockedByShield = true;
+            effectType = "STEAL_BLOCKED";
+            goldDelta = 0;
+            message = `🛡️ ถูกขัดขวาง! ${topTarget.username} มีโล่ตำรวจป้องกันการขโมย!`;
+            await prisma.partyMember.update({
+              where: { id: topTarget.id },
+              data: { hasShield: false },
+            });
+            await prisma.partyMember.update({
+              where: { id: currentMember.id },
+              data: { hasPickedChest: true, pickedChest: chosenNum },
+            });
+          } else {
+            const stolenAmount = Math.max(30, Math.floor(topTarget.gold * 0.25));
+            effectType = "STEAL_SUCCESS";
+            goldDelta = stolenAmount;
+            message = `🥷 ย่องเบาสำเร็จ! คุณขโมยทองจาก ${topTarget.username} มาได้ +${stolenAmount}G!`;
+
+            await prisma.$transaction([
+              prisma.partyMember.update({
+                where: { id: topTarget.id },
+                data: { gold: Math.max(0, topTarget.gold - stolenAmount) },
+              }),
+              prisma.partyMember.update({
+                where: { id: currentMember.id },
+                data: { gold: currentMember.gold + stolenAmount, hasPickedChest: true, pickedChest: chosenNum },
+              }),
+            ]);
+          }
+        } else {
+          // ถ้าไม่มีใครให้ปล้น -> มอบกล่องสมบัติลับ
+          effectType = "GOLD_100";
+          goldDelta = 100;
+          message = `🗝️ คลังทองลับใต้ดิน! คุณขุดพบหีบสมบัติ +100G!`;
+          await prisma.partyMember.update({
+            where: { id: currentMember.id },
+            data: { gold: { increment: 100 }, hasPickedChest: true, pickedChest: chosenNum },
+          });
+        }
+      } else if (roll < 0.70) {
+        // 4. 🛡️ POLICE SHIELD (โล่ตำรวจพิทักษ์ทรัพย์ + เหรียญทอง 50G)
+        effectType = "SHIELD";
+        goldDelta = 50;
+        message = `🛡️ ได้รับ 'โล่ตำรวจพิทักษ์ทรัพย์' ป้องกันการถูกขโมย 1 ครั้ง พร้อมเหรียญทอง +50G!`;
+        await prisma.partyMember.update({
+          where: { id: currentMember.id },
+          data: { hasShield: true, gold: { increment: 50 }, hasPickedChest: true, pickedChest: chosenNum },
+        });
+      } else if (roll < 0.84) {
+        // 5. 👑 MEGA JACKPOT (+250G)
+        effectType = "GOLD_250";
+        goldDelta = 250;
+        message = `👑 MEGA JACKPOT! ขุมทรัพย์ทองคำแท่งบริสุทธิ์ +250G!`;
+        await prisma.partyMember.update({
+          where: { id: currentMember.id },
+          data: { gold: { increment: 250 }, hasPickedChest: true, pickedChest: chosenNum },
+        });
+      } else if (roll < 0.93) {
+        // 6. 💣 BOMB TRAP (กับดักระเบิด -15%)
         const lossAmount = Math.floor(currentMember.gold * 0.15);
         effectType = "BOMB";
         goldDelta = -lossAmount;
         message = lossAmount > 0
-          ? `💣 กับดักระเบิดทำงาน! เสียทองไป -${lossAmount}G!`
-          : "💣 เจอกับดักระเบิด! แต่คุณยังไม่มีทองให้เสีย";
+          ? `💣 กับดักระเบิดทำงานในกล่องที่ ${chosenNum}! ทองคำระเบิดกระจุย -${lossAmount}G!`
+          : `💣 กับดักระเบิดทำงาน! แต่คุณยังไม่มีทองให้เสีย (รอดตัวไป!)`;
 
-        if (lossAmount > 0) {
-          await prisma.partyMember.update({
-            where: { id: currentMember.id },
-            data: { gold: Math.max(0, currentMember.gold - lossAmount) },
-          });
-        }
+        await prisma.partyMember.update({
+          where: { id: currentMember.id },
+          data: {
+            gold: lossAmount > 0 ? Math.max(0, currentMember.gold - lossAmount) : undefined,
+            hasPickedChest: true,
+            pickedChest: chosenNum,
+          },
+        });
+      } else {
+        // 7. 💰 GOLD 75G
+        effectType = "GOLD_75";
+        goldDelta = 75;
+        message = `💰 ได้รับถุงเหรียญทองคำ +75G!`;
+        await prisma.partyMember.update({
+          where: { id: currentMember.id },
+          data: { gold: { increment: 75 }, hasPickedChest: true, pickedChest: chosenNum },
+        });
       }
 
       // บันทึกว่าผู้เล่นได้เลือกเปิดกล่องสุ่มหมายเลขนี้แล้ว

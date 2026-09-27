@@ -1119,9 +1119,43 @@ export default function ArenaRoomPage() {
 
               {/* Chest Outcome Reveal */}
               {chestOutcome && (
-                <div className="bg-slate-900 border-2 border-amber-400 rounded-2xl p-4 text-center animate-in zoom-in-95">
-                  <p className="text-sm font-black text-amber-300">
+                <div
+                  className={`mt-4 rounded-3xl p-5 text-center animate-in zoom-in-95 duration-300 border-2 shadow-2xl ${
+                    chestOutcome.effectType.includes("SWAP")
+                      ? "bg-purple-950/90 border-purple-400 text-purple-200 ring-2 ring-purple-400/40"
+                      : chestOutcome.effectType.includes("DOUBLE")
+                      ? "bg-amber-950/90 border-yellow-300 text-yellow-200 ring-2 ring-yellow-400/40"
+                      : chestOutcome.effectType.includes("STEAL")
+                      ? "bg-orange-950/90 border-orange-400 text-orange-200 ring-2 ring-orange-400/40"
+                      : chestOutcome.effectType.includes("SHIELD")
+                      ? "bg-cyan-950/90 border-cyan-400 text-cyan-200 ring-2 ring-cyan-400/40"
+                      : chestOutcome.effectType.includes("BOMB")
+                      ? "bg-red-950/90 border-red-500 text-red-200 ring-2 ring-red-400/40"
+                      : "bg-slate-900 border-amber-400 text-amber-200 ring-2 ring-amber-400/40"
+                  }`}
+                >
+                  <div className="text-4xl mb-2 animate-bounce">
+                    {chestOutcome.effectType.includes("SWAP")
+                      ? "🔄"
+                      : chestOutcome.effectType.includes("DOUBLE")
+                      ? "✖️2️⃣"
+                      : chestOutcome.effectType.includes("STEAL")
+                      ? "🥷"
+                      : chestOutcome.effectType.includes("SHIELD")
+                      ? "🛡️"
+                      : chestOutcome.effectType.includes("BOMB")
+                      ? "💣"
+                      : "👑"}
+                  </div>
+                  <h4 className="text-sm sm:text-base font-black tracking-tight mb-1 text-white">
                     {chestOutcome.message}
+                  </h4>
+                  <p className="text-xs font-bold opacity-80">
+                    {chestOutcome.goldDelta > 0
+                      ? `คะแนนทองสะสม: +${chestOutcome.goldDelta}G`
+                      : chestOutcome.goldDelta < 0
+                      ? `คะแนนทองลดลง: ${chestOutcome.goldDelta}G`
+                      : "ไอเทมพิเศษพร้อมใช้งานทันที!"}
                   </p>
                 </div>
               )}
