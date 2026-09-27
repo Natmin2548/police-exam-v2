@@ -418,12 +418,21 @@ export default function ArenaLobbyPage() {
                 หมวดวิชาข้อสอบ
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {["รวมทุกวิชา", "กฎหมาย", "คอมพิวเตอร์", "ภาษาไทย"].map((cat) => (
+                {[
+                  "รวมทุกวิชา",
+                  "ความสามารถทั่วไป",
+                  "ภาษาไทย",
+                  "ภาษาอังกฤษ",
+                  "คอมพิวเตอร์",
+                  "กฎหมาย",
+                  "สังคมและวัฒนธรรม",
+                  "งานสารบรรณ",
+                ].map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setSelectedCategory(cat)}
-                    className={`cursor-pointer py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                    className={`cursor-pointer py-2 px-3 rounded-xl text-xs font-bold border transition-all text-left truncate ${
                       selectedCategory === cat
                         ? "bg-red-50 border-[#BD1B0B] text-[#BD1B0B] shadow-2xs"
                         : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
@@ -438,10 +447,10 @@ export default function ArenaLobbyPage() {
             {/* Question count */}
             <div className="mb-6">
               <label className="text-xs font-bold text-slate-700 block mb-2">
-                จำนวนข้อสอบต่อเกม
+                จำนวนข้อสอบต่อเกม (สุ่มดึงทุกบท)
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {[5, 10].map((num) => (
+                {[5, 10, 20, 30].map((num) => (
                   <button
                     key={num}
                     type="button"

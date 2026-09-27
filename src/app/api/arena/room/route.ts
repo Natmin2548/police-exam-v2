@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getEmailSafe } from "@/lib/supabaseServer";
+import { normalizeCategoryQuery } from "@/lib/categoryUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -112,12 +113,13 @@ export async function POST(request: NextRequest) {
     const displayName = user.fullName?.trim() || user.username || `ผู้สอบ #${user.id}`;
     const avatar = user.faceImage || null;
 
-    // Helper: สุ่มข้อสอบจาก Database
+    // Helper: สุ่มข้อสอบจาก Database กระจายทุกบท
     const fetchQuestionsPool = async (cat: string, count: number) => {
       let whereClause: any = {};
       if (cat && cat !== "รวมทุกวิชา") {
+        const catQuery = normalizeCategoryQuery(cat);
         whereClause = {
-          examSet: { category: { contains: cat, mode: "insensitive" } },
+          examSet: { category: { contains: catQuery, mode: "insensitive" } },
         };
       }
 
@@ -134,7 +136,7 @@ export async function POST(request: NextRequest) {
           explanation: true,
           examSet: { select: { category: true } },
         },
-        take: 100,
+        take: 500, // สุ่มจากข้อสอบทั้งหมดในหมวดนั้น
       });
 
       const shuffled = [...questions].sort(() => 0.5 - Math.random());
@@ -165,7 +167,7 @@ export async function POST(request: NextRequest) {
     // -------------------------------------------------------------------------
     if (action === "create") {
       const code = await generateRoomCode();
-      const questionCount = Math.max(3, Math.min(Number(totalQ) || 5, 10));
+      const questionCount = Math.max(3, Math.min(Number(totalQ) || 5, 50));
       const pool = await fetchQuestionsPool(category, questionCount);
 
       if (pool.length === 0) {
