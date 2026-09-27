@@ -77,6 +77,8 @@ export default function ArenaRoomPage() {
 
   const [room, setRoom] = useState<RoomData | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [serverIsHost, setServerIsHost] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -125,6 +127,8 @@ export default function ArenaRoomPage() {
       if (res.ok) {
         const json = await res.json();
         setRoom(json.room);
+        if (json.currentUserId) setCurrentUserId(json.currentUserId);
+        if (typeof json.isHost === "boolean") setServerIsHost(json.isHost);
         return json.room;
       } else {
         const errJson = await res.json();
@@ -484,8 +488,21 @@ export default function ArenaRoomPage() {
     );
   }
 
-  const isHost = room.members.some((m) => m.userId === currentUser?.id && m.isHost);
-  const currentMember = room.members.find((m) => m.userId === currentUser?.id);
+  const currentMember = room.members.find(
+    (m: any) =>
+      (currentUserId && m.userId === currentUserId) ||
+      m.isCurrentMember ||
+      (currentUser?.email && m.username?.toLowerCase().includes(currentUser.email.split("@")[0].toLowerCase())) ||
+      (room.members.length === 1 && m.isHost)
+  );
+
+  const isHost =
+    serverIsHost ||
+    currentMember?.isHost ||
+    (currentUserId && room.hostId === currentUserId) ||
+    (room.members.length === 1 && room.members[0]?.isHost) ||
+    false;
+
   const currentQuestion = room.questions[room.currentQIdx];
 
   // ===========================================================================

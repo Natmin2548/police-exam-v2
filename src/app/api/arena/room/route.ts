@@ -63,6 +63,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
 
+    // Authenticate caller to identify current user and host status
+    const email = await getEmailSafe(request);
+    let currentDbUser = null;
+    if (email) {
+      currentDbUser = await prisma.user.findFirst({
+        where: { email: { equals: email, mode: "insensitive" } },
+        select: { id: true, username: true, fullName: true },
+      });
+    }
+
+    const currentUserId = currentDbUser?.id ?? null;
+    const isHost = currentUserId ? room.hostId === currentUserId : room.members.length === 1;
+
     // Sanitized questions (อย่าส่งเฉลยตัวจริงถ้าเกมยังไม่จบ)
     const rawQuestions = Array.isArray(room.questions) ? room.questions : [];
     const sanitizedQuestions = rawQuestions.map((q: any) => ({
@@ -74,12 +87,20 @@ export async function GET(request: NextRequest) {
       correctAnswer: room.status === "FINISHED" ? q.correctAnswer : undefined,
     }));
 
+    const membersWithFlag = room.members.map((m) => ({
+      ...m,
+      isCurrentMember: currentUserId ? m.userId === currentUserId : false,
+    }));
+
     return NextResponse.json({
       room: {
         ...room,
+        members: membersWithFlag,
         questions: sanitizedQuestions,
         totalQuestionsCount: rawQuestions.length,
       },
+      currentUserId,
+      isHost,
     });
   } catch (error: any) {
     console.error("Error in /api/arena/room GET:", error);
