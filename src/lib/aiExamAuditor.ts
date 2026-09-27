@@ -4,7 +4,7 @@ export interface AIQuestionAuditResult {
   isReportValid: boolean; // มีข้อผิดพลาดจริงหรือไม่
   errorType: "WRONG_ANSWER" | "TYPO" | "AMBIGUOUS" | "OUTDATED_LAW" | "NO_ERROR";
   confidence: number; // 0.00 - 1.00
-  legalReference?: string; // มาตราหรือระเบียบอ้างอิง
+  legalReference?: string; // มาตรา สูตร หรือระเบียบอ้างอิง
   coreFact: string; // ข้อเท็จจริงสำคัญเพื่อเก็บเข้าคลังความรู้
   detailedReason: string; // คำชี้แจงเพื่อแจ้งผู้ใช้/แอดมิน
   correctedQuestion?: {
@@ -41,21 +41,194 @@ function getOpenRouterKey(): string {
   return process.env.OPENROUTER_API_KEY || SYSTEM_KEYS.openrouter;
 }
 
+// =============================================================================
+// SUBJECT-SPECIFIC PROMPT ENGINES (แยกบทบาทและกติกาเฉพาะวิชา ไม่เหมารวม)
+// =============================================================================
+
+export interface SubjectConfig {
+  code: "LAW" | "SARABAN" | "MATH" | "THAI" | "ENGLISH" | "COMPUTER" | "ETHICS_SOCIETY";
+  displayName: string;
+  role: string;
+  rules: string[];
+  referenceLabel: string;
+  knowledgeLabel: string;
+}
+
 /**
- * Examiner via Groq (Ultra-fast Frontier Model)
+ * วิเคราะห์หมวดวิชาจากข้อมูลข้อสอบและเหตุผลการรายงาน เพื่อเลือก Persona & กติกาที่ถูกต้อง
  */
-async function callGroqExaminer(
+export function getSubjectConfig(categoryInput: string, textContext: string): SubjectConfig {
+  const combined = (categoryInput + " " + textContext).toLowerCase();
+
+  // 1. Math / General Ability / Calculation
+  if (
+    combined.includes("คำนวณ") ||
+    combined.includes("ทั่วไป") ||
+    combined.includes("คณิต") ||
+    combined.includes("อนุกรม") ||
+    combined.includes("อุปมา") ||
+    combined.includes("สมการ") ||
+    combined.includes("ร้อยละ") ||
+    combined.includes("ห.ร.ม") ||
+    combined.includes("ค.ร.น") ||
+    combined.includes("เชาวน์") ||
+    combined.includes("โอเปอเรชัน") ||
+    combined.includes("operation") ||
+    combined.includes("ความน่าจะเป็น")
+  ) {
+    return {
+      code: "MATH",
+      displayName: "วิชาความสามารถทั่วไปและการคิดคำนวณ (คณิตศาสตร์/ตรรกศาสตร์)",
+      role: "คุณคือผู้เชี่ยวชาญการตรวจข้อสอบวิชาความสามารถทั่วไปและการคิดคำนวณ (คณิตศาสตร์, อนุกรม, ตรรกศาสตร์, สดมภ์, เชาวน์ปัญญา) สำหรับการสอบคัดเลือกข้าราชการตำรวจ",
+      rules: [
+        "จงแสดงการคิดคำนวณและลำดับขั้นตอนวิธีทำอย่างละเอียดทีละขั้น (Step-by-step)",
+        "ตรวจสอบความถูกต้องของสูตรคณิตศาสตร์และผลลัพธ์ตัวเลขให้แน่นอน 100% ห้ามเดาหรือคิดเลขคลาดเคลื่อน",
+        "หากผู้ใช้ทักท้วงเรื่องโจทย์กำกวม คิดได้หลายวิธี หรือเฉลยคำนวณผิด ให้ตรวจสอบวิธีการคำนวณที่ถูกต้องที่สุดตามหลักคณิตศาสตร์สากล",
+      ],
+      referenceLabel: "สูตร/ทฤษฎีบททางคณิตศาสตร์หรือตรรกศาสตร์ที่ใช้",
+      knowledgeLabel: "คลังสูตรและวิธีคิดทางคณิตศาสตร์ที่เคยบันทึกไว้ในระบบ",
+    };
+  }
+
+  // 2. English Language
+  if (
+    combined.includes("อังกฤษ") ||
+    combined.includes("english") ||
+    combined.includes("vocab") ||
+    combined.includes("grammar") ||
+    combined.includes("conversation") ||
+    combined.includes("reading")
+  ) {
+    return {
+      code: "ENGLISH",
+      displayName: "วิชาภาษาอังกฤษ (English Language)",
+      role: "You are an expert English Language Professor & Police Examination Auditor specializing in Grammar, Vocabulary, Reading Comprehension, and Conversation.",
+      rules: [
+        "วิเคราะห์โครงสร้างไวยากรณ์ (Grammar Rules, Tenses, Subject-Verb Agreement, Passive Voice) หรือบริบทการใช้คำศัพท์/สำนวนอย่างละเอียด",
+        "ให้คำอธิบายเป็นภาษาไทยที่สุภาพ ชัดเจน เข้าใจง่าย อธิบายว่าทำไมตัวเลือกที่ถูกต้องจึงถูก และทำไมตัวเลือกอื่นจึงผิดหรือไม่เป็นธรรมชาติ",
+        "ตรวจสอบว่าผู้ใช้จำสับสนระหว่าง British/American English หรือจำความหมายผิดบริบทหรือไม่",
+      ],
+      referenceLabel: "หลักไวยากรณ์ (Grammar Rule) หรือพจนานุกรมอ้างอิง (เช่น Oxford, Cambridge)",
+      knowledgeLabel: "คลังศัพท์และหลักไวยากรณ์ภาษาอังกฤษที่เคยบันทึกไว้ในระบบ",
+    };
+  }
+
+  // 3. Thai Language
+  if (
+    combined.includes("ภาษาไทย") ||
+    combined.includes("วิชาไทย") ||
+    combined.includes("ราชาศัพท์") ||
+    combined.includes("การใช้ภาษา") ||
+    combined.includes("ร้อยกรอง") ||
+    combined.includes("สำนวน")
+  ) {
+    return {
+      code: "THAI",
+      displayName: "วิชาภาษาไทย",
+      role: "คุณคือราชบัณฑิตและผู้เชี่ยวชาญการตรวจข้อสอบวิชาภาษาไทย (หลักภาษา, การใช้คำ, การสะกดคำ, คำราชาศัพท์, การอ่านจับใจความ, การเรียงประโยค) สำหรับการสอบข้าราชการตำรวจ",
+      rules: [
+        "ตรวจสอบการสะกดคำ การใช้คำ และความหมายตามพจนานุกรมฉบับราชบัณฑิตยสถานอย่างเคร่งครัด",
+        "ในเรื่องคำราชาศัพท์ ให้ยึดตามระเบียบสำนักพระราชวังและหลักเกณฑ์ของราชบัณฑิตยสภา",
+        "อธิบายจุดถูก-ผิดของแต่ละตัวเลือกอย่างชัดเจนและมีหลักวิชาการรองรับ",
+      ],
+      referenceLabel: "พจนานุกรมฉบับราชบัณฑิตยสถาน / หลักไวยากรณ์ไทย",
+      knowledgeLabel: "คลังหลักภาษาไทยและคำศัพท์ที่เคยบันทึกไว้ในระบบ",
+    };
+  }
+
+  // 4. Saraban (ระเบียบงานสารบรรณ)
+  if (
+    combined.includes("สารบรรณ") ||
+    combined.includes("๒๕๒๖") ||
+    combined.includes("2526") ||
+    combined.includes("๕๔") ||
+    combined.includes("54") ||
+    combined.includes("หนังสือราชการ") ||
+    combined.includes("ตราครุฑ")
+  ) {
+    return {
+      code: "SARABAN",
+      displayName: "วิชางานสารบรรณและระเบียบงานตำรวจ",
+      role: "คุณคือผู้เชี่ยวชาญระเบียบงานสารบรรณ (ระเบียบสำนักนายกรัฐมนตรีว่าด้วยงานสารบรรณ พ.ศ. ๒๕๒๖ และที่แก้ไขเพิ่มเติม, ประมวลระเบียบการตำรวจไม่เกี่ยวกับคดี ลักษณะที่ ๕๔ สารบรรณตำรวจ)",
+      rules: [
+        "ตรวจสอบความถูกต้องของประเภทหนังสือราชการ รูปแบบ ตราครุฑ ชั้นความเร็ว ชั้นความลับ และขั้นตอนการปฏิบัติ",
+        "อ้างอิง 'ข้อ' ในระเบียบสำนักนายกฯ ๒๕๒๖ หรือ 'ข้อ' ใน ปรต. ลักษณะ ๕๔ อย่างชัดเจนแม่นยำ (เช่น ข้อ ๑๑, ข้อ ๒๙ หรือ ปรต. ลัก.๕๔ ข้อ ๔)",
+        "ระวังความแตกต่างระหว่างระเบียบสารบรรณสำนักนายกฯ ทั่วไป กับระเบียบเฉพาะของสำนักงานตำรวจแห่งชาติ (ลักษณะ ๕๔)",
+      ],
+      referenceLabel: "ระเบียบสำนักนายกฯ ว่าด้วยงานสารบรรณ / ปรต. ลักษณะที่ ๕๔ ข้อ...",
+      knowledgeLabel: "คลังระเบียบงานสารบรรณที่เคยบันทึกไว้ในระบบ",
+    };
+  }
+
+  // 5. Computer / IT
+  if (
+    combined.includes("คอมพิวเตอร์") ||
+    combined.includes("สารสนเทศ") ||
+    combined.includes("ict") ||
+    combined.includes("network") ||
+    combined.includes("cyber") ||
+    combined.includes("พ.ร.บ.คอม")
+  ) {
+    return {
+      code: "COMPUTER",
+      displayName: "วิชาเทคโนโลยีสารสนเทศและคอมพิวเตอร์เพื่อการสื่อสาร",
+      role: "คุณคือผู้เชี่ยวชาญด้านเทคโนโลยีสารสนเทศ (ICT), วิทยาการคอมพิวเตอร์ และ พ.ร.บ.ว่าด้วยการกระทำความผิดเกี่ยวกับคอมพิวเตอร์ สำหรับการสอบตำรวจ",
+      rules: [
+        "ตรวจสอบความถูกต้องตามมาตรฐานสากลด้านคอมพิวเตอร์ เครือข่าย (OSI Model, IP, Protocol), ซอฟต์แวร์ และความปลอดภัยทางไซเบอร์",
+        "หากเป็นข้อสอบกฎหมายคอมพิวเตอร์ ให้อ้างอิง พ.ร.บ.ว่าด้วยการกระทำความผิดเกี่ยวกับคอมพิวเตอร์ พ.ศ. ๒๕๕๐ และแก้ไขเพิ่มเติม (ฉบับที่ ๒) พ.ศ. ๒๕๖๐ มาตราที่เกี่ยวข้องให้ถูกต้อง",
+        "อธิบายความหมายและฟังก์ชันการทำงานทางเทคนิคให้เข้าใจง่ายและถูกต้องตามหลักวิชาชีพ IT",
+      ],
+      referenceLabel: "มาตรฐาน ICT สากล / พ.ร.บ.คอมพิวเตอร์ฯ มาตรา...",
+      knowledgeLabel: "คลังความรู้เทคโนโลยีสารสนเทศที่เคยบันทึกไว้ในระบบ",
+    };
+  }
+
+  // 6. Society / Ethics / Culture
+  if (
+    combined.includes("สังคม") ||
+    combined.includes("จริยธรรม") ||
+    combined.includes("วัฒนธรรม") ||
+    combined.includes("อาเซียน") ||
+    combined.includes("เศรษฐกิจพอเพียง")
+  ) {
+    return {
+      code: "ETHICS_SOCIETY",
+      displayName: "วิชาสังคม วัฒนธรรม จริยธรรม และความรู้ทั่วไป",
+      role: "คุณคือผู้เชี่ยวชาญวิชาสังคม วัฒนธรรม จริยธรรมข้าราชการตำรวจ และความรู้เกี่ยวกับประชาคมอาเซียนสำหรับการสอบตำรวจ",
+      rules: [
+        "ตรวจสอบกับประมวลจริยธรรมข้าราชการตำรวจ พ.ศ. ๒๕๖๔, หลักปรัชญาของเศรษฐกิจพอเพียง, และข้อเท็จจริงทางประวัติศาสตร์/สังคม/อาเซียน",
+        "อธิบายเหตุผลและข้อเท็จจริงอย่างเป็นกลาง มีหลักฐานหรือแหล่งข้อมูลทางราชการสนับสนุน",
+      ],
+      referenceLabel: "ประมวลจริยธรรมข้าราชการตำรวจ / หลักปรัชญาเศรษฐกิจพอเพียง / ข้อเท็จจริงราชการ",
+      knowledgeLabel: "คลังความรู้สังคมและจริยธรรมที่เคยบันทึกไว้ในระบบ",
+    };
+  }
+
+  // 7. Default: Law (กฎหมายตำรวจ / ป.อาญา / ป.วิ.อาญา / พ.ร.บ.ตำรวจ ๒๕๖๕)
+  return {
+    code: "LAW",
+    displayName: "วิชากฎหมายที่ประชาชนควรรู้และกฎหมายตำรวจ",
+    role: "คุณคือผู้เชี่ยวชาญกฎหมายตำรวจและนิติศาสตร์สำหรับการสอบตำรวจ (พ.ร.บ.ตำรวจแห่งชาติ พ.ศ. ๒๕๖๕, ประมวลกฎหมายอาญา, ประมวลกฎหมายวิธีพิจารณาความอาญา, กฎ ก.ตร.)",
+    rules: [
+      "ตรวจสอบกับตัวบทกฎหมายปัจจุบันอย่างเคร่งครัด โดยเฉพาะ พ.ร.บ.ตำรวจแห่งชาติ พ.ศ. ๒๕๖๕ (ระวังผู้ใช้หรือข้อสอบจำ พ.ร.บ.ตำรวจ ๒๕๔๗ ฉบับเก่ามา)",
+      "อ้างอิงเลขมาตรา (มาตรา วรรค อนุมาตรา) ให้ตรงกับตัวบทจริงเท่านั้น ห้ามจำสับสนหรืออ้างอิงผิดมาตรา",
+      "แยกแยะระหว่างความผิดอาญายอมความได้กับยอมความไม่ได้, องค์ประกอบความผิด, และอำนาจสอบสวน/จับกุม/ค้น อย่างแม่นยำ",
+    ],
+    referenceLabel: "พระราชบัญญัติตำรวจแห่งชาติ ๒๕๖๕ / ป.อาญา / ป.วิ.อาญา มาตรา...",
+    knowledgeLabel: "คลังความรู้กฎหมายที่เคยบันทึกไว้ในระบบ",
+  };
+}
+
+function buildExaminerPrompt(
   questionData: any,
   userReason: string,
-  knowledgeContext: string[]
-): Promise<AIQuestionAuditResult | null> {
-  const apiKey = getGroqKey();
-  if (!apiKey) return null;
-
-  const prompt = `คุณคือผู้เชี่ยวชาญการตรวจข้อสอบนายสิบตำรวจและกฎหมายตำรวจแห่งชาติ (พ.ร.บ.ตำรวจแห่งชาติ พ.ศ. 2565, ป.อาญา, ป.วิ.อาญา, ก.ตร., ระเบียบสำนักนายกฯ)
+  knowledgeContext: string[],
+  subjectCfg: SubjectConfig
+): string {
+  return `${subjectCfg.role}
 
 [ข้อมูลข้อสอบปัจจุบัน]
-หมวดวิชา: ${questionData.category || "ความรู้ตำรวจ"}
+หมวดวิชา: ${subjectCfg.displayName} (${questionData.category || questionData.topic || "-"})
 โจทย์: ${questionData.questionText}
 ตัวเลือก 1: ${questionData.choice1}
 ตัวเลือก 2: ${questionData.choice2}
@@ -67,20 +240,21 @@ async function callGroqExaminer(
 [ข้อความรายงานจากผู้เข้าสอบ]
 "${userReason}"
 
-[คลังความรู้กฎหมายที่เคยบันทึกไว้ในระบบ]
+[${subjectCfg.knowledgeLabel}]
 ${knowledgeContext.length > 0 ? knowledgeContext.join("\n- ") : "ยังไม่มีข้อมูลเฉพาะในคลัง"}
 
-จงวิเคราะห์อย่างละเอียดว่าข้อสอบนี้มีข้อผิดพลาดตามที่ผู้ใช้แจ้งหรือไม่
-*ข้อควรระวัง: ผู้ใช้อาจจำกฎหมายฉบับเก่ามา หรือผู้ใช้ตอบผิดเองแล้วเข้าใจผิดว่าเฉลยผิด ตรวจสอบกับตัวบทกฎหมายปัจจุบัน (เช่น พ.ร.บ.ตำรวจ 2565) ให้ถูกต้องเด็ดขาด*
+[กติกาและหลักเกณฑ์การตรวจสอบเฉพาะวิชานี้]
+${subjectCfg.rules.map((r, i) => `${i + 1}. ${r}`).join("\n")}
+*ข้อควรระวัง: ผู้ใช้อาจเข้าใจผิดเอง หรือจำข้อมูลเก่ามา ตรวจสอบกับหลักวิชาการและข้อมูลที่เป็นปัจจุบันให้ถูกต้องเด็ดขาด*
 
 ตอบกลับเป็น JSON เท่านั้น (ห้ามมีคำนำหรือ markdown code block ครอบ) ตามโครงสร้างนี้:
 {
   "isReportValid": true หรือ false,
   "errorType": "WRONG_ANSWER" | "TYPO" | "AMBIGUOUS" | "OUTDATED_LAW" | "NO_ERROR",
   "confidence": ตัวเลข 0.00 ถึง 1.00,
-  "legalReference": "มาตรา หรือ ระเบียบที่ใช้อ้างอิง (ถ้ามี)",
+  "legalReference": "${subjectCfg.referenceLabel}",
   "coreFact": "สาระสำคัญความรู้ที่เป็นข้อยุติสำหรับเก็บเข้าคลังความรู้",
-  "detailedReason": "คำอธิบายภาษาไทยสรุปเหตุผลอย่างสุภาพ ชัดเจน",
+  "detailedReason": "คำอธิบายภาษาไทยสรุปเหตุผลตามหลักวิชาอย่างสุภาพ ชัดเจน",
   "correctedQuestion": {
     "questionText": "โจทย์ที่แก้ไขแล้ว (ถ้าไม่ต้องแก้โจทย์ให้ใช้ของเดิม)",
     "choice1": "ตัวเลือก 1",
@@ -88,10 +262,60 @@ ${knowledgeContext.length > 0 ? knowledgeContext.join("\n- ") : "ยังไม
     "choice3": "ตัวเลือก 3",
     "choice4": "ตัวเลือก 4",
     "correctAnswer": ตัวเลข 1-4 ที่ถูกต้อง,
-    "explanation": "คำอธิบายเฉลยที่ถูกต้องและอ้างอิงมาตรากฎหมายชัดเจน"
+    "explanation": "คำอธิบายเฉลยที่ถูกต้องและอ้างอิงหลักการชัดเจน"
   }
 }`;
+}
 
+function buildCrossAuditorPrompt(
+  questionData: any,
+  userReason: string,
+  examinerProposal: AIQuestionAuditResult,
+  subjectCfg: SubjectConfig
+): string {
+  return `คุณคือผู้ตรวจประเมินข้อสอบอิสระ (Independent Exam Auditor) ใน${subjectCfg.displayName}
+จงตรวจสอบผลการตรวจข้อสอบของระบบว่าถูกต้องตรงตามหลักวิชาการและข้อเท็จจริงหรือไม่
+
+[โจทย์ข้อสอบ]
+${questionData.questionText}
+1. ${questionData.choice1}
+2. ${questionData.choice2}
+3. ${questionData.choice3}
+4. ${questionData.choice4}
+เฉลยเดิม: ข้อ ${questionData.correctAnswer}
+
+[ผู้ใช้ร้องเรียน]
+"${userReason}"
+
+[ผลการวินิจฉัยของ Examiner ใน${subjectCfg.displayName}]
+มีข้อผิดพลาด: ${examinerProposal.isReportValid ? "จริง" : "ไม่จริง (ข้อสอบเดิมถูกแล้ว)"}
+เฉลยใหม่ที่เสนอ: ข้อ ${examinerProposal.correctedQuestion?.correctAnswer || questionData.correctAnswer}
+หลักอ้างอิง: ${examinerProposal.legalReference || "-"}
+เหตุผล: ${examinerProposal.detailedReason}
+
+คุณเห็นชอบกับการตัดสินใน${subjectCfg.displayName}นี้หรือไม่?
+ตอบกลับเป็น JSON เท่านั้น:
+{
+  "agreesWithExaminer": true หรือ false,
+  "confidence": ตัวเลข 0.00 ถึง 1.00,
+  "feedback": "ความเห็นสั้นๆ ตามหลักวิชา"
+}`;
+}
+
+// =============================================================================
+// CALLERS (GROQ & OPENROUTER WITH PROMPT PASSING)
+// =============================================================================
+
+async function callGroqExaminer(
+  questionData: any,
+  userReason: string,
+  knowledgeContext: string[],
+  subjectCfg: SubjectConfig
+): Promise<AIQuestionAuditResult | null> {
+  const apiKey = getGroqKey();
+  if (!apiKey) return null;
+
+  const prompt = buildExaminerPrompt(questionData, userReason, knowledgeContext, subjectCfg);
   const models = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"];
 
   for (const model of models) {
@@ -129,54 +353,16 @@ ${knowledgeContext.length > 0 ? knowledgeContext.join("\n- ") : "ยังไม
   return null;
 }
 
-/**
- * Examiner via OpenRouter (Llama 3.3 70B Instruct)
- */
 async function callOpenRouterExaminer(
   questionData: any,
   userReason: string,
-  knowledgeContext: string[]
+  knowledgeContext: string[],
+  subjectCfg: SubjectConfig
 ): Promise<AIQuestionAuditResult | null> {
   const apiKey = getOpenRouterKey();
   if (!apiKey) return null;
 
-  const prompt = `คุณคือผู้เชี่ยวชาญการตรวจข้อสอบนายสิบตำรวจและกฎหมายตำรวจแห่งชาติ (พ.ร.บ.ตำรวจแห่งชาติ พ.ศ. 2565, ป.อาญา, ป.วิ.อาญา, ก.ตร., ระเบียบสำนักนายกฯ)
-
-[ข้อมูลข้อสอบปัจจุบัน]
-หมวดวิชา: ${questionData.category || "ความรู้ตำรวจ"}
-โจทย์: ${questionData.questionText}
-ตัวเลือก 1: ${questionData.choice1}
-ตัวเลือก 2: ${questionData.choice2}
-ตัวเลือก 3: ${questionData.choice3}
-ตัวเลือก 4: ${questionData.choice4}
-เฉลยเดิม: ข้อ ${questionData.correctAnswer}
-คำอธิบายเดิม: ${questionData.explanation || "-"}
-
-[ข้อความรายงานจากผู้เข้าสอบ]
-"${userReason}"
-
-[คลังความรู้กฎหมายที่เคยบันทึกไว้ในระบบ]
-${knowledgeContext.length > 0 ? knowledgeContext.join("\n- ") : "ยังไม่มีข้อมูลเฉพาะในคลัง"}
-
-จงวิเคราะห์อย่างละเอียดว่าข้อสอบนี้มีข้อผิดพลาดตามที่ผู้ใช้แจ้งหรือไม่
-ตอบกลับเป็น JSON เท่านั้น:
-{
-  "isReportValid": true หรือ false,
-  "errorType": "WRONG_ANSWER" | "TYPO" | "AMBIGUOUS" | "OUTDATED_LAW" | "NO_ERROR",
-  "confidence": ตัวเลข 0.00 ถึง 1.00,
-  "legalReference": "มาตรา หรือ ระเบียบที่ใช้อ้างอิง (ถ้ามี)",
-  "coreFact": "สาระสำคัญความรู้ที่เป็นข้อยุติสำหรับเก็บเข้าคลังความรู้",
-  "detailedReason": "คำอธิบายภาษาไทยสรุปเหตุผลอย่างสุภาพ ชัดเจน",
-  "correctedQuestion": {
-    "questionText": "โจทย์ที่แก้ไขแล้ว (ถ้าไม่ต้องแก้โจทย์ให้ใช้ของเดิม)",
-    "choice1": "ตัวเลือก 1",
-    "choice2": "ตัวเลือก 2",
-    "choice3": "ตัวเลือก 3",
-    "choice4": "ตัวเลือก 4",
-    "correctAnswer": ตัวเลข 1-4 ที่ถูกต้อง,
-    "explanation": "คำอธิบายเฉลยที่ถูกต้องและอ้างอิงมาตรากฎหมายชัดเจน"
-  }
-}`;
+  const prompt = buildExaminerPrompt(questionData, userReason, knowledgeContext, subjectCfg);
 
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -210,42 +396,14 @@ ${knowledgeContext.length > 0 ? knowledgeContext.join("\n- ") : "ยังไม
   }
 }
 
-/**
- * Cross-Auditor (Independent Verification by a second AI provider)
- */
 async function callCrossAuditor(
   questionData: any,
   userReason: string,
   examinerProposal: AIQuestionAuditResult,
+  subjectCfg: SubjectConfig,
   preferProvider: "openrouter" | "groq"
 ): Promise<{ agreesWithExaminer: boolean; confidence: number; feedback: string } | null> {
-  const prompt = `คุณคือผู้ตรวจประเมินข้อสอบอิสระ (Independent Exam Auditor)
-จงตรวจสอบผลการตรวจข้อสอบของระบบว่าถูกต้องตรงตามกฎหมายและวิชาการหรือไม่
-
-[โจทย์ข้อสอบ]
-${questionData.questionText}
-1. ${questionData.choice1}
-2. ${questionData.choice2}
-3. ${questionData.choice3}
-4. ${questionData.choice4}
-เฉลยเดิม: ข้อ ${questionData.correctAnswer}
-
-[ผู้ใช้ร้องเรียน]
-"${userReason}"
-
-[ผลการวินิจฉัยของ Examiner]
-มีข้อผิดพลาด: ${examinerProposal.isReportValid ? "จริง" : "ไม่จริง (ข้อสอบเดิมถูกแล้ว)"}
-เฉลยใหม่ที่เสนอ: ข้อ ${examinerProposal.correctedQuestion?.correctAnswer || questionData.correctAnswer}
-หลักกฎหมายอ้างอิง: ${examinerProposal.legalReference || "-"}
-เหตุผล: ${examinerProposal.detailedReason}
-
-คุณเห็นชอบกับการตัดสินนี้หรือไม่?
-ตอบกลับเป็น JSON เท่านั้น:
-{
-  "agreesWithExaminer": true หรือ false,
-  "confidence": ตัวเลข 0.00 ถึง 1.00,
-  "feedback": "ความเห็นสั้นๆ"
-}`;
+  const prompt = buildCrossAuditorPrompt(questionData, userReason, examinerProposal, subjectCfg);
 
   if (preferProvider === "openrouter") {
     const apiKey = getOpenRouterKey();
@@ -323,14 +481,10 @@ ${questionData.questionText}
   return null;
 }
 
-/**
- * Main Autonomous Audit Runner:
- * 1. Checks Knowledge Bank (RAG)
- * 2. Runs Dual-AI (Groq GPT-OSS-120B + OpenRouter Llama 3.3)
- * 3. Auto-Approves if high confidence consensus
- * 4. Saves learned knowledge to ExamKnowledgeBank
- * 5. Sends instant notification to reporting user
- */
+// =============================================================================
+// MAIN AUDIT RUNNER
+// =============================================================================
+
 export async function auditReportedQuestion(reportId: number) {
   try {
     const report = await prisma.reportedQuestion.findUnique({
@@ -352,14 +506,22 @@ export async function auditReportedQuestion(reportId: number) {
       : null;
 
     if (!question) {
-      // If not in database Question table (e.g. from static mock json)
       return { success: false, message: "Question not found in database Question table" };
     }
 
+    // Detect subject category and load specialized persona/rules
+    const rawCategory = question.topic || question.examSet?.category || "";
+    const subjectCfg = getSubjectConfig(rawCategory, `${report.reason} ${question.questionText}`);
+
     // 1. Retrieve relevant memories from ExamKnowledgeBank (RAG)
-    const category = question.topic || question.examSet?.category || "กฎหมายตำรวจ";
     const relevantKnowledge = await prisma.examKnowledgeBank.findMany({
-      where: { category: { equals: category, mode: "insensitive" } },
+      where: {
+        OR: [
+          { category: { equals: subjectCfg.code, mode: "insensitive" } },
+          { category: { equals: subjectCfg.displayName, mode: "insensitive" } },
+          { category: { equals: rawCategory, mode: "insensitive" } },
+        ],
+      },
       orderBy: { timesReferenced: "desc" },
       take: 5,
     });
@@ -367,14 +529,14 @@ export async function auditReportedQuestion(reportId: number) {
       (k) => `[${k.legalReference || k.topic}]: ${k.coreFact}`
     );
 
-    // 2. Primary AI Examiner (Try Groq first, fallback to OpenRouter)
-    let primaryResult = await callGroqExaminer(question, report.reason, knowledgeSnippets);
+    // 2. Primary AI Examiner (Subject Specialized)
+    let primaryResult = await callGroqExaminer(question, report.reason, knowledgeSnippets, subjectCfg);
     let primaryEngine = "Groq GPT-OSS-120B";
     let crossEngine = "OpenRouter Llama-3.3";
 
     if (!primaryResult) {
-      console.log("[AI Auditor] Groq examiner unavailable, falling back to OpenRouter...");
-      primaryResult = await callOpenRouterExaminer(question, report.reason, knowledgeSnippets);
+      console.log(`[AI Auditor] Groq examiner unavailable for ${subjectCfg.code}, falling back to OpenRouter...`);
+      primaryResult = await callOpenRouterExaminer(question, report.reason, knowledgeSnippets, subjectCfg);
       primaryEngine = "OpenRouter Llama-3.3";
       crossEngine = "Groq GPT-OSS-120B";
     }
@@ -388,6 +550,7 @@ export async function auditReportedQuestion(reportId: number) {
       question,
       report.reason,
       primaryResult,
+      subjectCfg,
       primaryEngine.includes("Groq") ? "openrouter" : "groq"
     );
 
@@ -401,6 +564,7 @@ export async function auditReportedQuestion(reportId: number) {
     );
 
     const analysisReport = {
+      subject: subjectCfg.displayName,
       examiner: { engine: primaryEngine, result: primaryResult },
       crossAuditor: crossResult ? { engine: crossEngine, result: crossResult } : null,
     };
@@ -448,7 +612,7 @@ export async function auditReportedQuestion(reportId: number) {
       if (primaryResult.coreFact) {
         const existingKnowledge = await prisma.examKnowledgeBank.findFirst({
           where: {
-            category,
+            category: subjectCfg.displayName,
             legalReference: primaryResult.legalReference || undefined,
           },
         });
@@ -464,8 +628,8 @@ export async function auditReportedQuestion(reportId: number) {
         } else {
           await prisma.examKnowledgeBank.create({
             data: {
-              category,
-              topic: primaryResult.legalReference || category,
+              category: subjectCfg.displayName,
+              topic: primaryResult.legalReference || subjectCfg.displayName,
               legalReference: primaryResult.legalReference || null,
               coreFact: primaryResult.coreFact,
               sampleQuestion: question.questionText,
@@ -485,7 +649,7 @@ export async function auditReportedQuestion(reportId: number) {
           aiConfidence: finalConfidence,
           aiAnalysis: analysisReport as any,
           previousData: previousData as any,
-          adminReply: `[AI ตรวจสอบและแก้ไขอัตโนมัติ]: ${primaryResult.detailedReason}`,
+          adminReply: `[AI ตรวจสอบและแก้ไขอัตโนมัติ (${subjectCfg.displayName})]: ${primaryResult.detailedReason}`,
           resolvedAt: now,
           resolvedBy: `Autonomous AI (${primaryEngine} + ${crossEngine})`,
         },
@@ -497,7 +661,7 @@ export async function auditReportedQuestion(reportId: number) {
           data: {
             userId: report.userId,
             title: `🎉 ข้อสอบที่คุณแจ้ง (#${report.questionId}) ได้รับการแก้ไขเรียบร้อยแล้ว`,
-            message: `ระบบ AI ได้ตรวจสอบกับตัวบทกฎหมายและแก้ไขเฉลยให้ถูกต้องทันที:\n\n${primaryResult.detailedReason}\n\nขอบคุณที่ร่วมเป็นส่วนหนึ่งในการพัฒนาคลังข้อสอบครับ!`,
+            message: `ระบบ AI ผู้เชี่ยวชาญ${subjectCfg.displayName} ได้ตรวจสอบและแก้ไขเฉลยให้ถูกต้องทันที:\n\n${primaryResult.detailedReason}\n\nขอบคุณที่ร่วมเป็นส่วนหนึ่งในการพัฒนาคลังข้อสอบครับ!`,
             type: "QUESTION_RESOLVED",
             link: "/archive",
             isRead: false,
@@ -509,7 +673,8 @@ export async function auditReportedQuestion(reportId: number) {
         success: true,
         action: "AUTO_RESOLVED",
         confidence: finalConfidence,
-        message: "AI ตรวจสอบพบข้อผิดพลาดจริง และได้อนุมัติแก้ไขลงฐานข้อมูลอัตโนมัติเรียบร้อยแล้ว",
+        subject: subjectCfg.displayName,
+        message: `AI ผู้เชี่ยวชาญ${subjectCfg.displayName} ตรวจสอบพบข้อผิดพลาดจริง และได้อนุมัติแก้ไขลงฐานข้อมูลอัตโนมัติเรียบร้อยแล้ว`,
       };
     }
 
@@ -525,7 +690,7 @@ export async function auditReportedQuestion(reportId: number) {
           autoResolved: true,
           aiConfidence: finalConfidence,
           aiAnalysis: analysisReport as any,
-          adminReply: `[AI ตรวจสอบแล้ว - ข้อสอบเดิมถูกต้อง]: ${primaryResult.detailedReason}`,
+          adminReply: `[AI ตรวจสอบแล้ว (${subjectCfg.displayName}) - ข้อสอบเดิมถูกต้อง]: ${primaryResult.detailedReason}`,
           resolvedAt: now,
           resolvedBy: `Autonomous AI (${primaryEngine} + ${crossEngine})`,
         },
@@ -536,7 +701,7 @@ export async function auditReportedQuestion(reportId: number) {
           data: {
             userId: report.userId,
             title: `ผลการตรวจสอบข้อสอบที่คุณแจ้ง (#${report.questionId})`,
-            message: `ระบบ AI ได้ตรวจสอบกับข้อกฎหมายแล้วพบว่า ข้อสอบเดิมมีเฉลยที่ถูกต้องอยู่แล้วครับ:\n\n${primaryResult.detailedReason}`,
+            message: `ระบบ AI ผู้เชี่ยวชาญ${subjectCfg.displayName} ได้ตรวจสอบแล้วพบว่า ข้อสอบเดิมมีเฉลยที่ถูกต้องอยู่แล้วครับ:\n\n${primaryResult.detailedReason}`,
             type: "SYSTEM_ALERT",
             link: "/archive",
             isRead: false,
@@ -548,7 +713,8 @@ export async function auditReportedQuestion(reportId: number) {
         success: true,
         action: "AUTO_REJECTED",
         confidence: finalConfidence,
-        message: "AI ตรวจสอบแล้วพบว่าข้อสอบเดิมถูกต้องอยู่แล้ว จึงปิดคำร้องอัตโนมัติ",
+        subject: subjectCfg.displayName,
+        message: `AI ผู้เชี่ยวชาญ${subjectCfg.displayName} ตรวจสอบแล้วพบว่าข้อสอบเดิมถูกต้องอยู่แล้ว จึงปิดคำร้องอัตโนมัติ`,
       };
     }
 
@@ -560,7 +726,7 @@ export async function auditReportedQuestion(reportId: number) {
       data: {
         aiConfidence: finalConfidence,
         aiAnalysis: analysisReport as any,
-        adminReply: `[AI ร่างข้อเสนอแนะ]: ${primaryResult.detailedReason}`,
+        adminReply: `[AI ร่างข้อเสนอแนะ (${subjectCfg.displayName})]: ${primaryResult.detailedReason}`,
       },
     });
 
@@ -568,7 +734,8 @@ export async function auditReportedQuestion(reportId: number) {
       success: true,
       action: "PENDING_ADMIN_REVIEW",
       confidence: finalConfidence,
-      message: "AI วิเคราะห์และร่างคำตอบไว้ให้แล้ว รอแอดมินกดอนุมัติในหน้า Admin Dashboard",
+      subject: subjectCfg.displayName,
+      message: `AI ผู้เชี่ยวชาญ${subjectCfg.displayName} วิเคราะห์และร่างคำตอบไว้ให้แล้ว รอแอดมินกดอนุมัติในหน้า Admin Dashboard`,
     };
   } catch (error: any) {
     console.error("[AI Auditor] Error auditing report:", error);
