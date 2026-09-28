@@ -85,7 +85,8 @@ export function getSubjectConfig(categoryInput: string, textContext: string): Su
       rules: [
         "จงแสดงการคิดคำนวณและลำดับขั้นตอนวิธีทำอย่างละเอียดทีละขั้น (Step-by-step)",
         "ตรวจสอบความถูกต้องของสูตรคณิตศาสตร์และผลลัพธ์ตัวเลขให้แน่นอน 100% ห้ามเดาหรือคิดเลขคลาดเคลื่อน",
-        "หากผู้ใช้ทักท้วงเรื่องโจทย์กำกวม คิดได้หลายวิธี หรือเฉลยคำนวณผิด ให้ตรวจสอบวิธีการคำนวณที่ถูกต้องที่สุดตามหลักคณิตศาสตร์สากล",
+        "สำหรับข้อสอบอุปมา-อุปไมย (Analogy): ต้องวิเคราะห์ระดับความสัมพันธ์ในมิติเดียวกันอย่างเคร่งครัด (Category Hierarchy): หากคู่แรกเป็น 'สัตว์ : หมวดหมู่ถิ่นอาศัย/ประเภทสรีระ' (เช่น ปลาวาฬ : สัตว์น้ำ) คู่ถัดไปจะต้องเป็น 'สัตว์ : หมวดหมู่ถิ่นอาศัย/สรีระ' ในระดับเดียวกัน (เช่น นกอินทรี : สัตว์ปีก หรือ เสือ : สัตว์บก) ห้ามลดระดับไปจับคู่กับชื่อทั่วไปหรือสายพันธุ์ย่อย (เช่น ห้ามตอบ 'นก' เพราะ 'สัตว์น้ำ' ไม่ใช่ชื่อสัตว์เดี่ยวแต่เป็นหมวดหมู่ประเภทสัตว์)",
+        "หากผู้ใช้ทักท้วงเรื่องโจทย์กำกวม คิดได้หลายวิธี หรือเฉลยคำนวณผิด ให้ตรวจสอบวิธีการคำนวณที่ถูกต้องที่สุดตามหลักคณิตศาสตร์และตรรกศาสตร์สากล",
       ],
       referenceLabel: "สูตร/ทฤษฎีบททางคณิตศาสตร์หรือตรรกศาสตร์ที่ใช้",
       knowledgeLabel: "คลังสูตรและวิธีคิดทางคณิตศาสตร์ที่เคยบันทึกไว้ในระบบ",
@@ -324,6 +325,12 @@ function buildExaminerPrompt(
 3. [หลักเกณฑ์และกติกาการตรวจสอบเฉพาะใน${subjectCfg.displayName}]
 ${subjectCfg.rules.map((r, i) => `   ${i + 1}. ${r}`).join("\n")}
 
+4. 🌟 [กฎเหล็กด้านการสื่อสาร - ให้ตอบเหมือนมนุษย์/ทีมงานอาจารย์ฝ่ายวิชาการ]:
+   - จงเขียน "detailedReason" ในฐานะ "ทีมงานฝ่ายวิชาการ" ด้วยภาษาที่สุภาพ นุ่มนวล ให้เกียรติผู้สอบ เสมือนครูอาจารย์ผู้ทรงคุณวุฒิตอบนักเรียน
+   - ห้ามใช้คำพูดเชิงหุ่นยนต์ ตัดสิน หรือต่อว่า เช่น "ผู้ใช้จึงไม่ถูกต้อง", "ผู้ใช้เข้าใจผิด", "ระบบ AI ตัดสินว่า", "[AI ตรวจสอบแล้ว]" โดยเด็ดขาด
+   - หากผู้ใช้ทักท้วงถูกต้อง / ข้อสอบเฉลยผิด (isReportValid = true): ให้เริ่มด้วยการกล่าวทักทาย ขอบคุณผู้สอบที่ช่วยทักท้วง ขออภัยในความผิดพลาด และอธิบายเฉลยที่ถูกต้องและเหตุผลอย่างสุภาพ เป็นมิตร
+   - หากข้อสอบเดิมถูกต้องอยู่แล้ว (isReportValid = false): ให้เริ่มด้วยการกล่าวทักทายอย่างสุภาพ อธิบายหลักวิชาการและลำดับความคิดของข้อสอบอย่างใจเย็นชัดเจน พร้อมขอบคุณที่ร่วมส่งข้อคิดเห็นเข้ามา
+
 ================================================================================
 📚 [ข้อมูลอ้างอิงจากคลังความรู้ทางการของระบบ]
 ================================================================================
@@ -350,7 +357,7 @@ ${knowledgeContext.length > 0 ? knowledgeContext.join("\n\n") : "ไม่มี
   "confidence": ตัวเลข 0.00 ถึง 1.00,
   "legalReference": "${subjectCfg.referenceLabel}",
   "coreFact": "สาระสำคัญความรู้ที่ถูกต้องสำหรับเก็บเข้าคลังความรู้",
-  "detailedReason": "คำอธิบายภาษาไทยสรุปเหตุผลอย่างสุภาพ ชัดเจน ชี้จุดถูก-ผิดเทียบกับคำร้องของผู้ใช้",
+  "detailedReason": "ข้อความตอบกลับผู้สอบอย่างเป็นทางการ เขียนในฐานะ 'ทีมงานฝ่ายวิชาการ' (ภาษามนุษย์ สุภาพ มีหางเสียงครับ/ค่ะ ไม่ใช้คำหุ่นยนต์เด็ดขาด)",
   "correctedQuestion": {
     "questionText": "โจทย์ที่ถูกต้อง",
     "choice1": "ตัวเลือก 1",
@@ -765,9 +772,9 @@ export async function auditReportedQuestion(reportId: number) {
           aiConfidence: finalConfidence,
           aiAnalysis: analysisReport as any,
           previousData: previousData as any,
-          adminReply: `[AI ตรวจสอบและแก้ไขอัตโนมัติ (${subjectCfg.displayName})]: ${primaryResult.detailedReason}`,
+          adminReply: primaryResult.detailedReason,
           resolvedAt: now,
-          resolvedBy: `Autonomous AI (${primaryEngine} + ${crossEngine})`,
+          resolvedBy: "ทีมงานวิชาการ",
         },
       });
 
@@ -776,8 +783,8 @@ export async function auditReportedQuestion(reportId: number) {
         await prisma.notification.create({
           data: {
             userId: report.userId,
-            title: `🎉 ข้อสอบที่คุณแจ้ง (#${report.questionId}) ได้รับการแก้ไขเรียบร้อยแล้ว`,
-            message: `ระบบ AI ผู้เชี่ยวชาญ${subjectCfg.displayName} ได้ตรวจสอบและแก้ไขเฉลยให้ถูกต้องทันที:\n\n${primaryResult.detailedReason}\n\nขอบคุณที่ร่วมเป็นส่วนหนึ่งในการพัฒนาคลังข้อสอบครับ!`,
+            title: `ข้อสอบที่คุณแจ้ง (#${report.questionId}) ได้รับการตรวจสอบและปรับปรุงแล้ว`,
+            message: `${primaryResult.detailedReason}\n\nขอขอบพระคุณที่ร่วมเป็นส่วนหนึ่งในการพัฒนาคลังข้อสอบร่วมกันครับ!`,
             type: "QUESTION_RESOLVED",
             link: "/archive",
             isRead: false,
@@ -790,7 +797,7 @@ export async function auditReportedQuestion(reportId: number) {
         action: "AUTO_RESOLVED",
         confidence: finalConfidence,
         subject: subjectCfg.displayName,
-        message: `AI ผู้เชี่ยวชาญ${subjectCfg.displayName} ตรวจสอบพบข้อผิดพลาดจริง และได้อนุมัติแก้ไขลงฐานข้อมูลอัตโนมัติเรียบร้อยแล้ว`,
+        message: `ทีมงานวิชาการตรวจสอบพบข้อผิดพลาดจริง และได้อนุมัติแก้ไขลงฐานข้อมูลเรียบร้อยแล้ว`,
       };
     }
 
@@ -806,9 +813,9 @@ export async function auditReportedQuestion(reportId: number) {
           autoResolved: true,
           aiConfidence: finalConfidence,
           aiAnalysis: analysisReport as any,
-          adminReply: `[AI ตรวจสอบแล้ว (${subjectCfg.displayName}) - ข้อสอบเดิมถูกต้อง]: ${primaryResult.detailedReason}`,
+          adminReply: primaryResult.detailedReason,
           resolvedAt: now,
-          resolvedBy: `Autonomous AI (${primaryEngine} + ${crossEngine})`,
+          resolvedBy: "ทีมงานวิชาการ",
         },
       });
 
@@ -817,7 +824,7 @@ export async function auditReportedQuestion(reportId: number) {
           data: {
             userId: report.userId,
             title: `ผลการตรวจสอบข้อสอบที่คุณแจ้ง (#${report.questionId})`,
-            message: `ระบบ AI ผู้เชี่ยวชาญ${subjectCfg.displayName} ได้ตรวจสอบแล้วพบว่า ข้อสอบเดิมมีเฉลยที่ถูกต้องอยู่แล้วครับ:\n\n${primaryResult.detailedReason}`,
+            message: `${primaryResult.detailedReason}\n\nขอขอบพระคุณที่ร่วมส่งข้อเสนอแนะเข้ามาครับ`,
             type: "SYSTEM_ALERT",
             link: "/archive",
             isRead: false,
@@ -830,7 +837,7 @@ export async function auditReportedQuestion(reportId: number) {
         action: "AUTO_REJECTED",
         confidence: finalConfidence,
         subject: subjectCfg.displayName,
-        message: `AI ผู้เชี่ยวชาญ${subjectCfg.displayName} ตรวจสอบแล้วพบว่าข้อสอบเดิมถูกต้องอยู่แล้ว จึงปิดคำร้องอัตโนมัติ`,
+        message: `ทีมงานวิชาการตรวจสอบแล้วพบว่าข้อสอบเดิมถูกต้องอยู่แล้ว จึงปิดคำร้องเรียบร้อยแล้ว`,
       };
     }
 
@@ -842,7 +849,7 @@ export async function auditReportedQuestion(reportId: number) {
       data: {
         aiConfidence: finalConfidence,
         aiAnalysis: analysisReport as any,
-        adminReply: `[AI ร่างข้อเสนอแนะ (${subjectCfg.displayName})]: ${primaryResult.detailedReason}`,
+        adminReply: primaryResult.detailedReason,
       },
     });
 
