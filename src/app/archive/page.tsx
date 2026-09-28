@@ -18,8 +18,12 @@ import {
   BookCheck,
   Layers,
   ArrowRight,
+  Sparkles,
+  PlusCircle,
 } from "lucide-react";
 import { MobileBottomNav } from "@/components/navigation/MobileBottomNav";
+import { supabase } from "@/lib/supabaseClient";
+import { CommunityGeneratorModal } from "@/components/exam/CommunityGeneratorModal";
 
 interface ChapterItem {
   num: string;
@@ -49,6 +53,14 @@ function ArchiveContent() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [chapterSearchQuery, setChapterSearchQuery] = useState("");
+  const [isGenModalOpen, setIsGenModalOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setUserEmail(user.email);
+    });
+  }, []);
 
   useEffect(() => {
     const fetchChapters = async () => {
@@ -207,14 +219,24 @@ function ArchiveContent() {
             )}
           </div>
 
-          {/* Back to Home Button */}
-          <Link
-            href="/home"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 hover:border-red-200 hover:text-[#BD1B0B] text-slate-700 transition-all shadow-2xs"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>กลับหน้าหลัก</span>
-          </Link>
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsGenModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black bg-[#BD1B0B] hover:bg-[#A81507] text-white transition-all shadow-md shadow-red-950/15 active:scale-95 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>สร้างข้อสอบด้วย AI</span>
+            </button>
+            <Link
+              href="/home"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white border border-slate-200 hover:border-red-200 hover:text-[#BD1B0B] text-slate-700 transition-all shadow-2xs"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>กลับหน้าหลัก</span>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -393,6 +415,30 @@ function ArchiveContent() {
               </div>
             </div>
 
+            {/* Banner: AI สร้างข้อสอบรายบทเข้าคลัง */}
+            <div className="relative overflow-hidden bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 rounded-3xl p-5 sm:p-6 text-white shadow-md shadow-red-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-white/20 text-white backdrop-blur-xs">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>AI สร้างข้อสอบรายบท (โควต้า 5 ครั้ง/วัน)</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-white">
+                  ไม่พบบทที่ต้องการ หรืออยากเพิ่มข้อสอบใหม่?
+                </h2>
+                <p className="text-xs text-red-100 font-medium">
+                  ให้ AI ช่วยสังเคราะห์ข้อสอบ 5 ข้อตามระเบียบทางการเข้าสู่คลังบทเรียนได้ทันที (+25 EXP)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGenModalOpen(true)}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white text-[#BD1B0B] hover:bg-amber-50 text-xs sm:text-sm font-black shadow-md shadow-black/10 active:scale-95 transition-all cursor-pointer shrink-0"
+              >
+                <PlusCircle className="w-4 h-4 text-[#BD1B0B]" />
+                <span>สร้างข้อสอบด้วย AI</span>
+              </button>
+            </div>
+
             {/* Mobile View (< sm): EXACT vertical stack of horizontal pills matching user's screenshot */}
             <div className="space-y-3 sm:hidden">
               {filteredCategories.map((cat) => (
@@ -488,6 +534,13 @@ function ArchiveContent() {
         )}
       </main>
       <MobileBottomNav />
+
+      {/* Community AI Generator Modal */}
+      <CommunityGeneratorModal
+        isOpen={isGenModalOpen}
+        onClose={() => setIsGenModalOpen(false)}
+        userEmail={userEmail}
+      />
     </div>
   );
 }

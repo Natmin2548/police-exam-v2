@@ -20,6 +20,7 @@ import {
   Sparkles,
   Flame,
   Swords,
+  PlusCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
@@ -27,6 +28,7 @@ import { MobileBottomNav } from "@/components/navigation/MobileBottomNav";
 import SupportModal from "@/components/SupportModal";
 import { NotificationsModal } from "@/components/home/NotificationsModal";
 import { DailyMissionsCard } from "@/components/home/DailyMissionsCard";
+import { CommunityGeneratorModal } from "@/components/exam/CommunityGeneratorModal";
 
 interface Recommendation {
   badge: string;
@@ -130,6 +132,7 @@ export default function HomePage() {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [showCommunityGenModal, setShowCommunityGenModal] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
@@ -572,6 +575,31 @@ export default function HomePage() {
               </div>
             </Link>
 
+            {/* Banner: AI สร้างข้อสอบรายบทเข้าคลังกลาง (หาง่าย เด่นชัด) */}
+            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white p-5 sm:p-6 shadow-md shadow-red-950/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-lg">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-white/20 text-white backdrop-blur-xs">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>ใหม่ • AI ออกข้อสอบตามบท (โควต้า 5 ครั้ง/วัน)</span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
+                  ร่วมสร้างข้อสอบเข้าคลังรวม
+                </h2>
+                <p className="text-xs text-red-100 font-medium">
+                  เลือกบทเรียน ให้ AI สังเคราะห์ข้อสอบ 5 ข้ออิงฐานข้อมูลจริง พร้อมตรวจสอบข้อซ้ำ 100% (+25 EXP)
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowCommunityGenModal(true)}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white text-[#BD1B0B] hover:bg-amber-50 text-xs sm:text-sm font-black shadow-md shadow-black/10 active:scale-95 transition-all cursor-pointer shrink-0"
+              >
+                <PlusCircle className="w-4 h-4 text-[#BD1B0B]" />
+                <span>กดสร้างข้อสอบที่นี่</span>
+              </button>
+            </div>
+
             {/* 4 Feature Cards (Simple & Clean 2x2 on Mobile, 4 columns on PC) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {/* Card 1: ร้องขอ/แจ้งเรื่อง */}
@@ -930,6 +958,13 @@ export default function HomePage() {
           onClose={() => setShowSupportModal(false)}
         />
       )}
+
+      {/* Community AI Exam Generator Modal */}
+      <CommunityGeneratorModal
+        isOpen={showCommunityGenModal}
+        onClose={() => setShowCommunityGenModal(false)}
+        userEmail={user?.email}
+      />
     </div>
   );
 }
