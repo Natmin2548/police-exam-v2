@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -12,9 +12,22 @@ import {
   Award,
   Sparkles,
   CheckCircle2,
+  Flame,
+  PlusCircle,
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { CommunityGeneratorModal } from "@/components/exam/CommunityGeneratorModal";
 
 export default function ExamSelectionPage() {
+  const [isGenModalOpen, setIsGenModalOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setUserEmail(user.email);
+    });
+  }, []);
+
   const options = [
     {
       id: "suppression",
@@ -83,13 +96,32 @@ export default function ExamSelectionPage() {
               เลือกสายงานที่ต้องการสอบ หรือเลือกทำข้อสอบย่อยแบบรายวิชา
             </p>
           </div>
+        </div>
 
-          {/* Quick Notice Badge */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white border border-slate-200/80 shadow-2xs self-start sm:self-auto">
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            <span className="text-xs font-bold text-slate-700">
-              อัปเดตเกณฑ์คะแนนตามประกาศ
-            </span>
+        {/* Community AI Exam Generator Banner */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-red-600 via-rose-700 to-amber-600 rounded-3xl p-6 sm:p-7 text-white shadow-xl shadow-red-950/15">
+          <div className="absolute top-0 right-0 -translate-y-8 translate-x-8 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-2 max-w-xl">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 backdrop-blur-xs text-[11px] font-black border border-white/30 text-white">
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                <span>ระบบสร้างข้อสอบส่วนกลางด้วย AI • โควต้า 5 ครั้ง/วัน</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                ร่วมสร้างและเติมคลังข้อสอบอิงตามบทเรียน
+              </h2>
+              <p className="text-xs sm:text-sm text-red-100/90 leading-relaxed font-medium">
+                เลือกบทเรียนที่ต้องการ แล้วให้ AI สังเคราะห์ข้อสอบ 5 ข้อจากฐานข้อมูลระเบียบจริง พร้อมตรวจสอบข้อซ้ำ 100% ข้อสอบจะเข้าสู่คลังกลางให้ทุกคนได้ฝึกทำ
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsGenModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white hover:bg-amber-50 text-[#BD1B0B] text-xs sm:text-sm font-black shadow-lg shadow-black/10 active:scale-95 transition-all cursor-pointer shrink-0"
+            >
+              <PlusCircle className="w-4 h-4 text-[#BD1B0B]" />
+              <span>สร้างข้อสอบเข้าคลัง</span>
+            </button>
           </div>
         </div>
 
@@ -196,6 +228,13 @@ export default function ExamSelectionPage() {
             );
           })}
         </div>
+
+        {/* Community AI Generator Modal */}
+        <CommunityGeneratorModal
+          isOpen={isGenModalOpen}
+          onClose={() => setIsGenModalOpen(false)}
+          userEmail={userEmail}
+        />
       </div>
     </div>
   );

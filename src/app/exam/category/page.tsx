@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -15,9 +15,21 @@ import {
   Sparkles,
   Layers,
   ArrowRight,
+  PlusCircle,
 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { CommunityGeneratorModal } from "@/components/exam/CommunityGeneratorModal";
 
 export default function ExamCategoryPage() {
+  const [isGenModalOpen, setIsGenModalOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setUserEmail(user.email);
+    });
+  }, []);
+
   const categories = [
     {
       id: "thai",
@@ -125,11 +137,20 @@ export default function ExamCategoryPage() {
             </p>
           </div>
 
-          <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white border border-slate-200/80 shadow-2xs self-start sm:self-auto">
-            <Layers className="w-4 h-4 text-[#BD1B0B]" />
-            <span className="text-xs font-bold text-slate-700">
-              คัดเลือกจากคลังข้อสอบจริง
-            </span>
+          <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
+            <button
+              onClick={() => setIsGenModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#BD1B0B] hover:bg-[#A81507] text-white text-xs font-black shadow-md shadow-red-950/20 active:scale-95 transition-all cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>สร้างข้อสอบเข้าคลัง</span>
+            </button>
+            <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white border border-slate-200/80 shadow-2xs">
+              <Layers className="w-4 h-4 text-[#BD1B0B]" />
+              <span className="text-xs font-bold text-slate-700">
+                คัดเลือกจากคลังข้อสอบจริง
+              </span>
+            </div>
           </div>
         </div>
 
@@ -218,6 +239,13 @@ export default function ExamCategoryPage() {
             );
           })}
         </div>
+
+        {/* Community AI Generator Modal */}
+        <CommunityGeneratorModal
+          isOpen={isGenModalOpen}
+          onClose={() => setIsGenModalOpen(false)}
+          userEmail={userEmail}
+        />
       </div>
     </div>
   );
