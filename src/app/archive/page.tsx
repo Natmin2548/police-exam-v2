@@ -62,25 +62,27 @@ function ArchiveContent() {
     });
   }, []);
 
-  useEffect(() => {
-    const fetchChapters = async () => {
-      try {
-        const res = await fetch("/api/exam/chapters");
-        if (res.ok) {
-          const data = await res.json();
-          if (data.categories) {
-            setCategories(data.categories);
-          }
+  const fetchChapters = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/exam/chapters?_t=${Date.now()}`, {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.categories) {
+          setCategories(data.categories);
         }
-      } catch (err) {
-        console.error("Failed to load chapters:", err);
-      } finally {
-        setLoading(false);
       }
-    };
-
-    fetchChapters();
+    } catch (err) {
+      console.error("Failed to load chapters:", err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchChapters();
+  }, [fetchChapters]);
 
   const activeCategory = categories.find(
     (c) =>
@@ -540,6 +542,7 @@ function ArchiveContent() {
         isOpen={isGenModalOpen}
         onClose={() => setIsGenModalOpen(false)}
         userEmail={userEmail}
+        onExamCreated={fetchChapters}
       />
     </div>
   );

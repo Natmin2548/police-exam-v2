@@ -132,20 +132,29 @@ export async function POST(req: NextRequest) {
 
     // 4. บันทึกเข้าคลังข้อสอบกลาง (ExamSet & Question)
     // 4.1 ค้นหาหรือสร้าง ExamSet สำหรับข้อสอบส่วนกลางบทนี้
+    const cleanChapterName = chapterName
+      .replace(/^บทที่\s*[0-9๑-๙]+(?:-[0-9๑-๙]+)?\s*[:\s]*/, "")
+      .trim();
+
     let examSet = await prisma.examSet.findFirst({
       where: {
         category: { equals: category, mode: "insensitive" },
-        title: { contains: chapterName, mode: "insensitive" },
         isPublic: true,
+        OR: [
+          { title: { contains: chapterName, mode: "insensitive" } },
+          { title: { contains: cleanChapterName, mode: "insensitive" } },
+          { subcategory: { contains: cleanChapterName, mode: "insensitive" } },
+        ],
       },
+      orderBy: { id: "asc" },
     });
 
     if (!examSet) {
       examSet = await prisma.examSet.create({
         data: {
-          title: `คลังข้อสอบชุมชน: ${category} - ${chapterName}`,
+          title: `แบบทดสอบ${category}: ${chapterName} (ชุดที่ 1)`,
           category: category,
-          subcategory: chapterName,
+          subcategory: cleanChapterName || chapterName,
           totalCount: 0,
           isPublic: true,
           status: "COMPLETED",
