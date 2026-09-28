@@ -853,12 +853,25 @@ export async function auditReportedQuestion(reportId: number) {
       },
     });
 
+    if (report.userId) {
+      await prisma.notification.create({
+        data: {
+          userId: report.userId,
+          title: `ทีมงานได้รับรายงานข้อสอบ (#${report.questionId}) ของคุณแล้ว`,
+          message: `${primaryResult.detailedReason}\n\nทางทีมงานฝ่ายวิชาการกำลังตรวจสอบและปรับปรุงเพิ่มเติม ขอบคุณที่ช่วยร่วมพัฒนาคลังข้อสอบครับ!`,
+          type: "SYSTEM_ALERT",
+          link: "/archive",
+          isRead: false,
+        },
+      });
+    }
+
     return {
       success: true,
       action: "PENDING_ADMIN_REVIEW",
       confidence: finalConfidence,
       subject: subjectCfg.displayName,
-      message: `AI ผู้เชี่ยวชาญ${subjectCfg.displayName} วิเคราะห์และร่างคำตอบไว้ให้แล้ว รอแอดมินกดอนุมัติในหน้า Admin Dashboard`,
+      message: `ทีมงานฝ่ายวิชาการได้บันทึกการวิเคราะห์ข้อสอบเรียบร้อยแล้ว`,
     };
   } catch (error: any) {
     console.error("[AI Auditor] Error auditing report:", error);
