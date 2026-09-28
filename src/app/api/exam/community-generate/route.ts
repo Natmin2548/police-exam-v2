@@ -116,8 +116,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. เรียกใช้งาน AI Generator Service เพื่อสร้างข้อสอบ 5 ข้อ
-    const genResult = await generateCommunityExam(category, chapterName, 5);
+    // 3. เรียกใช้งาน AI Generator Service เพื่อสร้างข้อสอบ 10 ข้อ
+    const genResult = await generateCommunityExam(category, chapterName, 10);
 
     if (!genResult.success || genResult.questions.length === 0) {
       return NextResponse.json(
@@ -196,7 +196,7 @@ export async function POST(req: NextRequest) {
       data: {
         userId: user.id,
         title: "สร้างข้อสอบเข้าคลังสำเร็จ (+25 EXP) 🎉",
-        message: `คุณได้สร้างข้อสอบ 5 ข้อในหมวด [${category} • ${chapterName}] เข้าสู่คลังกลางเรียบร้อยแล้ว เพื่อนสมาชิกทุกคนสามารถเข้าฝึกทำได้แล้ววันนี้`,
+        message: `คุณได้สร้างข้อสอบ ${questionsToCreate.length} ข้อในหมวด [${category} • ${chapterName}] เข้าสู่คลังกลางเรียบร้อยแล้ว เพื่อนสมาชิกทุกคนสามารถเข้าฝึกทำได้แล้ววันนี้`,
         type: "COMMUNITY_EXAM",
         link: "/exam/category",
       },

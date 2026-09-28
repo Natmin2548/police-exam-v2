@@ -151,7 +151,7 @@ async function callAIGenerator(
   chapterName: string,
   knowledgeContext: string,
   blacklistQuestions: string[],
-  count: number = 5
+  count: number = 10
 ): Promise<GeneratedQuestionItem[]> {
   const systemPrompt = `คุณคือผู้เชี่ยวชาญการออกข้อสอบสำหรับการสอบคัดเลือกข้าราชการตำรวจ (นายสิบตำรวจ/นายร้อยตำรวจ)
 เป้าหมายของคุณคือ ออกข้อสอบ 4 ตัวเลือก จำนวน ${count} ข้อ โดยต้องปฏิบัติตามกฎเหล็กอย่างเคร่งครัด:
@@ -217,7 +217,7 @@ ${
           body: JSON.stringify({
             model,
             temperature: 0.3,
-            max_tokens: 3500,
+            max_tokens: 5000,
             response_format: { type: "json_object" },
             messages: [
               { role: "system", content: systemPrompt },
@@ -359,7 +359,7 @@ function sanitizeQuestions(rawList: any[], defaultTopic: string): GeneratedQuest
 export async function generateCommunityExam(
   category: string,
   chapterName: string,
-  count: number = 5
+  count: number = 10
 ): Promise<GenerationResult> {
   try {
     // 1. ดึงข้อสอบเดิมที่มีอยู่ในบทนี้เพื่อทำ Blacklist ป้องกันข้อซ้ำ

@@ -353,7 +353,7 @@ export const CommunityGeneratorModal: React.FC<CommunityGeneratorModalProps> = (
                   ) : (
                     <div className="w-4 h-4 rounded-full border border-slate-300 shrink-0" />
                   )}
-                  <span>2. AI สังเคราะห์ข้อสอบ 5 ข้อตามมาตรฐานสอบตำรวจ...</span>
+                  <span>2. AI สังเคราะห์ข้อสอบ 10 ข้อตามมาตรฐานสอบตำรวจ...</span>
                 </div>
 
                 <div
@@ -386,7 +386,7 @@ export const CommunityGeneratorModal: React.FC<CommunityGeneratorModalProps> = (
                   +25 EXP นำเข้าคลังสำเร็จ
                 </span>
                 <h3 className="text-xl font-black text-slate-900 pt-2">
-                  เพิ่มข้อสอบ 5 ข้อเข้าคลังส่วนกลางแล้ว!
+                  เพิ่มข้อสอบ {successInfo.count} ข้อเข้าคลังส่วนกลางแล้ว!
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">
                   {successInfo.category} • {successInfo.chapterName}
@@ -449,7 +449,7 @@ export const CommunityGeneratorModal: React.FC<CommunityGeneratorModalProps> = (
                 className="px-6 py-2.5 rounded-2xl text-xs font-black text-white bg-[#BD1B0B] hover:bg-[#A81507] disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-red-950/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
               >
                 <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>ยืนยันสร้าง 5 ข้อ</span>
+                <span>ยืนยันสร้าง 10 ข้อ</span>
               </button>
             </>
           )}
