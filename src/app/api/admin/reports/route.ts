@@ -39,6 +39,35 @@ export async function GET(req: NextRequest) {
       prisma.examKnowledgeBank.count(),
     ]);
 
+    // Attach Question details (choices, answer, explanation)
+    const qIds = reports
+      .map((r) => parseInt(r.questionId, 10))
+      .filter((id) => !isNaN(id));
+
+    const questions = await prisma.question.findMany({
+      where: { id: { in: qIds } },
+      select: {
+        id: true,
+        examSetId: true,
+        choice1: true,
+        choice2: true,
+        choice3: true,
+        choice4: true,
+        correctAnswer: true,
+        explanation: true,
+        topic: true,
+      },
+    });
+
+    const qMap = new Map(questions.map((q) => [q.id, q]));
+    const reportsWithQuestion = reports.map((r) => {
+      const qId = parseInt(r.questionId, 10);
+      return {
+        ...r,
+        question: !isNaN(qId) ? qMap.get(qId) || null : null,
+      };
+    });
+
     // Auto-process any pending reports asynchronously in background so admin never needs to click
     const pendingToAutoAudit = reports.filter((r) => r.status === "PENDING").slice(0, 5);
     if (pendingToAutoAudit.length > 0) {
@@ -49,7 +78,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      reports,
+      reports: reportsWithQuestion,
       stats: {
         total: totalCount,
         autoResolved: autoResolvedCount,

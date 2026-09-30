@@ -71,6 +71,35 @@ export async function GET(request: Request) {
       prisma.systemSetting.findMany({ where: { key: { startsWith: "hb_" } } }),
     ]);
 
+    // Attach Question details (choices, answer, explanation) for each report
+    const qIds = recentReports
+      .map((r) => parseInt(r.questionId, 10))
+      .filter((id) => !isNaN(id));
+
+    const questions = await prisma.question.findMany({
+      where: { id: { in: qIds } },
+      select: {
+        id: true,
+        examSetId: true,
+        choice1: true,
+        choice2: true,
+        choice3: true,
+        choice4: true,
+        correctAnswer: true,
+        explanation: true,
+        topic: true,
+      },
+    });
+
+    const qMap = new Map(questions.map((q) => [q.id, q]));
+    const reportsWithQuestion = recentReports.map((r) => {
+      const qId = parseInt(r.questionId, 10);
+      return {
+        ...r,
+        question: !isNaN(qId) ? qMap.get(qId) || null : null,
+      };
+    });
+
     const onlineUsers = heartbeats.filter((r) => r.value >= fiveMinutesAgo).length;
 
     return NextResponse.json({
@@ -85,7 +114,7 @@ export async function GET(request: Request) {
       avgScore: Math.round(avgScoreRaw._avg.scorePct ?? 0),
       onlineUsers,
       reportedCount,
-      recentReports,
+      recentReports: reportsWithQuestion,
       supportTicketCount,
       recentTickets,
     });

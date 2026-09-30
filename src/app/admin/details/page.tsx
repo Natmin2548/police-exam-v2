@@ -24,6 +24,7 @@ import {
   Bell,
   CornerDownRight,
   Filter,
+  Eye,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -45,6 +46,12 @@ export default function AdminDetailsPage() {
   const [activeSection, setActiveSection] = useState<"tickets" | "reports">("tickets");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "RESOLVED">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Choices inspection state for reports
+  const [expandedChoices, setExpandedChoices] = useState<Record<number, boolean>>({});
+  const toggleChoices = (reportId: number) => {
+    setExpandedChoices((prev) => ({ ...prev, [reportId]: !prev[reportId] }));
+  };
 
   // Active Reply States
   const [replyingTicketId, setReplyingTicketId] = useState<number | null>(null);
@@ -887,6 +894,81 @@ export default function AdminDetailsPage() {
                       </p>
                     </div>
 
+                    {/* Question Choices & Answer Display */}
+                    {(() => {
+                      const qData = report.question || (report.previousData as any);
+                      if (!qData) return null;
+                      const isOpen = expandedChoices[report.id];
+                      return (
+                        <div className="bg-slate-50/90 border border-slate-200/80 rounded-2xl p-3.5 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                                <span>🎯 เฉลยที่บันทึกไว้ในระบบ:</span>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                  ตัวเลือกที่ {qData.correctAnswer}
+                                </span>
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => toggleChoices(report.id)}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-xl transition-colors cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>{isOpen ? "ซ่อนตัวเลือก" : "เช็คตัวเลือกทั้ง 4 ข้อ & เฉลย"}</span>
+                            </button>
+                          </div>
+
+                          {/* Collapsible Choices List */}
+                          {isOpen && (
+                            <div className="space-y-1.5 pt-2 border-t border-slate-200/70 animate-slide-up">
+                              {[1, 2, 3, 4].map((num) => {
+                                const choiceText = qData[`choice${num}`];
+                                const isCorrect = Number(qData.correctAnswer) === num;
+                                if (!choiceText) return null;
+                                return (
+                                  <div
+                                    key={num}
+                                    className={`flex items-start gap-2.5 p-2.5 rounded-xl text-xs transition-colors ${
+                                      isCorrect
+                                        ? "bg-emerald-50 border border-emerald-300 text-emerald-950 font-bold shadow-2xs"
+                                        : "bg-white border border-slate-200 text-slate-700 font-medium"
+                                    }`}
+                                  >
+                                    <span
+                                      className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black ${
+                                        isCorrect
+                                          ? "bg-emerald-600 text-white"
+                                          : "bg-slate-200 text-slate-600"
+                                      }`}
+                                    >
+                                      {isCorrect ? "✓" : num}
+                                    </span>
+                                    <span className="flex-1 leading-relaxed">
+                                      {choiceText}
+                                    </span>
+                                    {isCorrect && (
+                                      <span className="shrink-0 text-[10px] font-black text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded-md">
+                                        เฉลยข้อนี้
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+
+                              {qData.explanation && (
+                                <div className="text-[11px] text-slate-700 bg-white/90 p-2.5 rounded-xl border border-slate-200 mt-2 leading-relaxed">
+                                  <span className="font-bold text-slate-800">💡 คำอธิบายเฉลยปัจจุบัน: </span>
+                                  <span>{qData.explanation}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Student's Reason & Report Details */}
                     <div className="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-4 space-y-2">
                       <div className="flex items-center justify-between">
@@ -969,7 +1051,11 @@ export default function AdminDetailsPage() {
 
                         {/* Direct link to edit question */}
                         <Link
-                          href={`/admin/questions?search=${encodeURIComponent(report.questionId)}`}
+                          href={
+                            report.question?.examSetId
+                              ? `/admin/questions/${report.question.examSetId}`
+                              : `/admin/questions?search=${encodeURIComponent(report.questionId)}`
+                          }
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
