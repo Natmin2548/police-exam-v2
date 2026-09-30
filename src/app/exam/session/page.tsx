@@ -645,7 +645,7 @@ function ExamSessionContent() {
 
                   {/* Explanation */}
                   {item.explanation && (
-                    <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs text-slate-700 leading-relaxed">
+                    <div className="p-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-xs text-slate-700 leading-relaxed whitespace-pre-line">
                       <span className="font-black text-slate-900 block mb-1">
                         คำอธิบายเฉลย:
                       </span>

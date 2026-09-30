@@ -958,7 +958,7 @@ export default function AdminDetailsPage() {
                               })}
 
                               {qData.explanation && (
-                                <div className="text-[11px] text-slate-700 bg-white/90 p-2.5 rounded-xl border border-slate-200 mt-2 leading-relaxed">
+                                <div className="text-[11px] text-slate-700 bg-white/90 p-2.5 rounded-xl border border-slate-200 mt-2 leading-relaxed whitespace-pre-line">
                                   <span className="font-bold text-slate-800">💡 คำอธิบายเฉลยปัจจุบัน: </span>
                                   <span>{qData.explanation}</span>
                                 </div>
