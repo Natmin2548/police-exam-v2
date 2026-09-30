@@ -270,6 +270,7 @@ ${subjectRules}
 4. [FORMATTING RULES - รูปแบบ]:
 - แต่ละข้อต้องมี 4 ตัวเลือก (choice1, choice2, choice3, choice4)
 - ตัวเลือกต้องชัดเจน มีคำตอบที่ถูกต้องที่สุดเพียงข้อเดียวเท่านั้น (correctAnswer: 1, 2, 3, หรือ 4)
+- ⚠️ กฎเหล็กตัวเลือก: ตัวเลือกทั้ง 4 (choice1 - choice4) ต้องแตกต่างกันโดยสิ้นเชิง ห้ามพิมพ์ช้อยส์ซ้ำกัน ห้ามความหมายเหมือนกัน หรือลอกข้อความเดียวกันเด็ดขาด
 - ตัวเลือกหลอกต้องสมเหตุสมผล ไม่กำกวม
 - explanation [กฎเหล็กการเฉลยละเอียด]: ต้องเขียนอธิบายเฉลยอย่างละเอียดระดับติวเตอร์มืออาชีพตามโครงสร้าง 4 ส่วนนี้เสมอ:
   ส่วนที่ ๑: อ้างอิงหลักการ / ตัวบทกฎหมาย / สูตร / ระเบียบทางการอย่างชัดเจน (เช่น ตาม ปรต. ลักษณะที่ ๕๔ บทที่... ข้อ... หรือ ตาม ป.อาญา มาตรา... หรือ สูตรคำนวณ...)
@@ -448,14 +449,39 @@ function sanitizeQuestions(rawList: any[], defaultTopic: string): GeneratedQuest
       subtopic: item.subtopic || "",
       sourceFact: item.sourceFact || "",
     }))
-    .filter(
-      (q) =>
-        q.questionText.length > 8 &&
-        q.choice1.length > 0 &&
-        q.choice2.length > 0 &&
-        q.choice3.length > 0 &&
-        q.choice4.length > 0
-    );
+    .filter((q) => {
+      // 1. ความยาวโจทย์และตัวเลือกต้องไม่ว่างเปล่า
+      if (
+        q.questionText.length < 10 ||
+        !q.choice1 ||
+        !q.choice2 ||
+        !q.choice3 ||
+        !q.choice4
+      ) {
+        return false;
+      }
+
+      // 2. 🛡️ ป้องกันช้อยส์ซ้ำ 100%: ตัวเลือกทั้ง 4 ต้องแตกต่างกัน ไม่ซ้ำกันเด็ดขาด
+      const choicesNormalized = [q.choice1, q.choice2, q.choice3, q.choice4].map((c) =>
+        c.toLowerCase().replace(/\s+/g, "")
+      );
+      const uniqueChoices = new Set(choicesNormalized);
+      if (uniqueChoices.size < 4) {
+        // มีช้อยส์ซ้ำกัน ตัดทิ้งทันที
+        return false;
+      }
+
+      // 3. ตรวจความคล้ายคลึงระหว่างช้อยส์ (ป้องกันช้อยส์ข้อความเหมือนกันเกิน 90%)
+      for (let i = 0; i < choicesNormalized.length; i++) {
+        for (let j = i + 1; j < choicesNormalized.length; j++) {
+          if (calculateSimilarity(choicesNormalized[i], choicesNormalized[j]) > 0.9) {
+            return false;
+          }
+        }
+      }
+
+      return true;
+    });
 }
 
 // =============================================================================
